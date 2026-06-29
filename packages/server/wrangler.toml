@@ -1,11 +1,8 @@
 name = "wx-score-room"
-main = "build/worker/index.js"
+main = "src/index.ts"
 compatibility_date = "2023-05-18"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "wx_score_room_db"
 database_id = "2858e78d-5e9a-40bd-8593-68ee660e7187"
-
-[build]
-command = "export PATH=\"$HOME/.cargo/bin:$PATH\" && (command -v cargo || (curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && . $HOME/.cargo/env && rustup target add wasm32-unknown-unknown)) && npx worker-build --release"
