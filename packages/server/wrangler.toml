@@ -8,4 +8,4 @@ database_name = "wx_score_room_db"
 database_id = "2858e78d-5e9a-40bd-8593-68ee660e7187"
 
 [build]
-command = "worker-build --release"
+command = "export PATH=\"$HOME/.cargo/bin:$PATH\" && (command -v cargo || (curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && source $HOME/.cargo/env && rustup target add wasm32-unknown-unknown)) && npm install -g worker-build && worker-build --release"
