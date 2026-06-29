@@ -1,0 +1,119 @@
+<view class="page-container index-page">
+  <!-- 自定义高端导航栏 -->
+  <view class="custom-navbar" style="height: {{statusBarHeight + navBarHeight}}px; padding-top: {{statusBarHeight}}px;">
+    <view class="navbar-title">🎲 微信计分房</view>
+  </view>
+
+  <!-- 页面主内容，防止被导航栏遮挡 -->
+  <view class="content-wrapper" style="padding-top: {{statusBarHeight + navBarHeight + 10}}px;">
+    
+    <!-- 个人信息卡片 (毛玻璃) -->
+    <view class="glass-card profile-setup-card">
+      <view class="card-header">
+        <text class="setup-title">👤 设置游戏身份</text>
+        <text class="setup-subtitle">设置后亲友可以更容易认出你</text>
+      </view>
+      
+      <view class="avatar-nickname-box flex-column flex-center">
+        <!-- 微信最新规范：选择头像按钮 -->
+        <button class="avatar-wrapper flex-center" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+          <image class="avatar" src="{{avatarUrl}}" mode="aspectFill" wx:if="{{avatarUrl}}"></image>
+          <view class="avatar-placeholder flex-column flex-center" wx:else>
+            <van-icon name="plus" color="#06d6a0" size="22px" />
+            <text class="placeholder-text">上传头像</text>
+          </view>
+          <view class="avatar-hover-tip flex-center" wx:if="{{avatarUrl}}">
+            <van-icon name="photograph" color="#ffffff" size="16px" />
+          </view>
+        </button>
+
+        <!-- 微信最新规范：获取昵称输入框 -->
+        <input type="nickname" class="nickname-input" placeholder="请输入游戏昵称" value="{{nickname}}" bindblur="onNicknameBlur" bindinput="onNicknameInput" />
+      </view>
+    </view>
+
+    <!-- 操作按钮组 (开房、加入房、扫码) -->
+    <view class="action-buttons-box">
+      <!-- 1. 快捷开房 -->
+      <view class="action-card glow-border" bindtap="onCreateRoom">
+        <view class="action-icon-box bg-green">
+          <van-icon name="plus" size="28px" color="#ffffff" />
+        </view>
+        <view class="action-text-box flex-column">
+          <text class="action-title">创建房间</text>
+          <text class="action-desc">新建专属房间，邀请亲友联机</text>
+        </view>
+        <van-icon name="arrow" color="#809a96" />
+      </view>
+
+      <!-- 2. 手动输房号 -->
+      <view class="action-card" bindtap="showJoinPopup">
+        <view class="action-icon-box bg-blue">
+          <van-icon name="edit" size="28px" color="#ffffff" />
+        </view>
+        <view class="action-text-box flex-column">
+          <text class="action-title">输入房号</text>
+          <text class="action-desc">输入6位数字房号快速进入</text>
+        </view>
+        <van-icon name="arrow" color="#809a96" />
+      </view>
+
+      <!-- 3. 扫码进房 -->
+      <view class="action-card" bindtap="onScanCode">
+        <view class="action-icon-box bg-purple">
+          <van-icon name="qr" size="28px" color="#ffffff" />
+        </view>
+        <view class="action-text-box flex-column">
+          <text class="action-title">扫码加入</text>
+          <text class="action-desc">扫描好友分享的房间二维码</text>
+        </view>
+        <van-icon name="arrow" color="#809a96" />
+      </view>
+    </view>
+
+    <!-- 战绩大厅入口 -->
+    <view class="history-entry-btn flex-center" bindtap="goToProfile">
+      <van-icon name="records" size="18px" />
+      <text class="entry-text">查看历史战绩与玩伴</text>
+    </view>
+
+  </view>
+
+  <!-- 输入房间号弹窗 -->
+  <van-popup
+    show="{{ showJoinModal }}"
+    position="bottom"
+    round
+    closeable
+    bind:close="onCloseJoinPopup"
+    custom-style="padding-bottom: 40rpx; border-radius: 40rpx 40rpx 0 0;"
+  >
+    <view class="join-popup-content flex-column flex-center">
+      <text class="popup-title">输入房间号</text>
+      <text class="popup-subtitle">请输入 6 位数字加入房间</text>
+      
+      <!-- 6格密码框式的输入框 -->
+      <view class="code-inputs flex-row" bindtap="focusInput">
+        <view class="code-cell {{ roomCodeInput.length === index ? 'active' : '' }} flex-center" wx:for="{{ 6 }}" wx:key="index">
+          <text class="code-char">{{ roomCodeInput[index] || '' }}</text>
+          <view class="cursor-bar" wx:if="{{ roomCodeInput.length === index }}"></view>
+        </view>
+      </view>
+      
+      <!-- 隐藏的真实输入框，用来唤起数字键盘 -->
+      <input
+        class="hidden-input"
+        type="number"
+        maxlength="6"
+        focus="{{ inputFocus }}"
+        value="{{ roomCodeInput }}"
+        bindinput="onRoomCodeInput"
+      />
+
+      <view class="popup-actions flex-row justify-between" style="width: 100%; margin-top: 40rpx; padding: 0 40rpx;">
+        <van-button custom-class="btn-outline" style="width: 45%;" bindtap="onCloseJoinPopup">取消</van-button>
+        <van-button custom-class="btn-blue" style="width: 45%;" disabled="{{ roomCodeInput.length < 6 }}" bindtap="submitJoinRoom">确认加入</van-button>
+      </view>
+    </view>
+  </van-popup>
+</view>

@@ -1,0 +1,97 @@
+<view class="page-container profile-page">
+  <!-- 自定义高端导航栏 -->
+  <view class="custom-navbar" style="height: {{statusBarHeight + navBarHeight}}px; padding-top: {{statusBarHeight}}px;">
+    <view class="navbar-back flex-center" bindtap="goBack">
+      <van-icon name="arrow-left" color="#ffffff" size="18px" />
+    </view>
+    <view class="navbar-title">📊 战绩大厅</view>
+  </view>
+
+  <view class="content-wrapper" style="padding-top: {{statusBarHeight + navBarHeight + 10}}px;">
+    
+    <!-- 个人名片 -->
+    <view class="glass-card user-badge-card flex-row align-center">
+      <view class="user-avatar-box flex-center">
+        <image class="user-avatar" src="{{userInfo.avatar_url}}" mode="aspectFill" wx:if="{{userInfo.avatar_url}}"></image>
+        <view class="user-avatar-text flex-center" wx:else>{{userInfo.nickname[0] || '?'}}</view>
+      </view>
+      <view class="user-info flex-column">
+        <text class="user-nickname">{{userInfo.nickname || '未登录'}}</text>
+        <text class="user-register-time">微信计分房专属游戏玩家</text>
+      </view>
+    </view>
+
+    <!-- Tab 切换 (历史对局 / 亲友战友) -->
+    <view class="tab-header flex-row">
+      <view class="tab-item {{activeTab === 0 ? 'active' : ''}} flex-center" bindtap="switchTab" data-index="{{0}}">
+        <van-icon name="clock-o" size="16px" style="margin-right: 8rpx;" />
+        <text>对局历史</text>
+      </view>
+      <view class="tab-item {{activeTab === 1 ? 'active' : ''}} flex-center" bindtap="switchTab" data-index="{{1}}">
+        <van-icon name="friends-o" size="16px" style="margin-right: 8rpx;" />
+        <text>我的战友</text>
+      </view>
+    </view>
+
+    <!-- 内容区域 -->
+    <view class="tab-content">
+      
+      <!-- 1. 历史对局列表 -->
+      <view class="history-list-view" wx:if="{{activeTab === 0}}">
+        <view class="glass-card history-card" wx:for="{{historyRooms}}" wx:key="room_id">
+          <view class="justify-between align-center">
+            <view class="flex-column">
+              <text class="room-code-tag">房间: {{item.room_code}}</text>
+              <text class="room-meta">房主: {{item.owner_nickname}}</text>
+            </view>
+            <view class="flex-column align-end">
+              <text class="final-score-title">最终得分</text>
+              <text class="final-score-num {{item.final_score > 0 ? 'score-positive' : (item.final_score < 0 ? 'score-negative' : 'score-zero')}}">
+                {{item.final_score > 0 ? '+' + item.final_score : item.final_score}}
+              </text>
+            </view>
+          </view>
+          
+          <view class="history-footer justify-between align-center" style="margin-top: 24rpx; padding-top: 20rpx; border-top: 1px solid rgba(255, 255, 255, 0.03);">
+            <text class="tea-pool-report" wx:if="{{item.accumulated_tea_money > 0}}">🍵 本局茶水: {{item.accumulated_tea_money}} 分</text>
+            <text class="tea-pool-report" wx:else>🍵 无茶水设置</text>
+            <text class="play-date">{{item.created_at}}</text>
+          </view>
+        </view>
+        
+        <view class="empty-state flex-column flex-center" wx:if="{{historyRooms.length === 0}}">
+          <van-icon name="todo-list-o" size="48px" color="#809a96" />
+          <text class="empty-text">你还没有参与过任何游戏对局</text>
+        </view>
+      </view>
+
+      <!-- 2. 战友榜列表 -->
+      <view class="friends-list-view" wx:if="{{activeTab === 1}}">
+        <view class="glass-card friend-stat-card flex-row align-center" wx:for="{{friendsList}}" wx:key="friend_id">
+          <view class="friend-avatar-box flex-center">
+            <image class="friend-avatar" src="{{item.avatar_url}}" mode="aspectFill" wx:if="{{item.avatar_url}}"></image>
+            <view class="friend-avatar-text flex-center" wx:else>{{item.nickname[0] || '?'}}</view>
+          </view>
+
+          <view class="friend-main-info flex-1 flex-column">
+            <text class="friend-name">{{item.nickname}}</text>
+            <text class="friend-count">共同对局 {{item.play_count}} 次</text>
+          </view>
+
+          <view class="friend-outcome-box flex-column align-end">
+            <text class="outcome-label">同场胜负累计</text>
+            <text class="outcome-score {{item.net_score > 0 ? 'score-positive' : (item.net_score < 0 ? 'score-negative' : 'score-zero')}}">
+              {{item.net_score > 0 ? '+' + item.net_score : item.net_score}} 分
+            </text>
+          </view>
+        </view>
+
+        <view class="empty-state flex-column flex-center" wx:if="{{friendsList.length === 0}}">
+          <van-icon name="cluster-o" size="48px" color="#809a96" />
+          <text class="empty-text">暂无一起游戏过的亲友，快去邀请他们吧</text>
+        </view>
+      </view>
+
+    </view>
+  </view>
+</view>

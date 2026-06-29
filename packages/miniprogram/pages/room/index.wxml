@@ -1,0 +1,277 @@
+<view class="page-container room-page">
+  <!-- 自定义高端导航栏 -->
+  <view class="custom-navbar" style="height: {{statusBarHeight + navBarHeight}}px; padding-top: {{statusBarHeight}}px;">
+    <view class="navbar-back flex-center" bindtap="goBack">
+      <van-icon name="arrow-left" color="#ffffff" size="18px" />
+    </view>
+    <view class="navbar-title">🏠 房间: {{roomCode}}</view>
+  </view>
+
+  <view class="content-wrapper" style="padding-top: {{statusBarHeight + navBarHeight + 10}}px;">
+    
+    <!-- 房间头部看板 (茶水钱和状态) -->
+    <view class="glass-card room-header-card">
+      <view class="justify-between align-center">
+        <view class="flex-column">
+          <text class="card-section-title">🍵 茶水金库</text>
+          <view class="tea-stats" style="margin-top: 10rpx;">
+            <text class="tea-current">{{roomInfo.accumulated_tea_money || 0}}</text>
+            <text class="tea-slash">/</text>
+            <text class="tea-total">{{roomInfo.total_tea_money || 0}} 分</text>
+          </view>
+        </view>
+        
+        <view class="header-actions flex-row">
+          <van-button size="small" custom-class="btn-outline" style="margin-right: 15rpx;" bindtap="showTeaPopup">设置茶水</van-button>
+          <van-button size="small" custom-class="btn-green" wx:if="{{isOwner && roomInfo.status === 0}}" bindtap="confirmSettleRoom">结算游戏</van-button>
+        </view>
+      </view>
+
+      <!-- 茶水进度条 -->
+      <view class="tea-progress-wrapper" wx:if="{{roomInfo.total_tea_money > 0}}">
+        <view class="tea-progress-bar" style="width: {{teaProgress}}%"></view>
+        <view class="tea-progress-glow" style="width: {{teaProgress}}%"></view>
+      </view>
+
+      <!-- 茶水收齐徽章 -->
+      <view class="tea-completed-badge flex-center" wx:if="{{roomInfo.total_tea_money > 0 && roomInfo.accumulated_tea_money >= roomInfo.total_tea_money}}">
+        <van-icon name="success" size="14px" style="margin-right: 6rpx;" />
+        <text>茶水已收齐，下课！</text>
+      </view>
+    </view>
+
+    <!-- 邀请与分享按钮栏 -->
+    <view class="room-action-bar flex-row justify-between">
+      <button class="action-btn flex-center btn-blue-shadow" open-type="share">
+        <van-icon name="share-o" size="16px" style="margin-right: 10rpx;" />
+        <text>邀请微信好友</text>
+      </button>
+      <view class="action-btn flex-center btn-green-shadow" bindtap="showQRCodePopup">
+        <van-icon name="qr" size="16px" style="margin-right: 10rpx;" />
+        <text>出示房间码</text>
+      </view>
+    </view>
+
+    <!-- 玩家列表区 -->
+    <view class="players-section">
+      <view class="section-header justify-between align-center">
+        <text class="section-title">👥 房间玩家 ({{players.length}}人)</text>
+        <text class="section-tip">💡 点击玩家头像可进行计分</text>
+      </view>
+
+      <!-- 自适应排版：少于等于4人使用大卡片网格布局，大于4人使用紧凑列表布局 -->
+      <view class="{{players.length <= 4 ? 'players-grid' : 'players-list'}}">
+        <view 
+          class="player-card glass-card {{players.length <= 4 ? '' : 'compact-row'}}" 
+          wx:for="{{players}}" 
+          wx:key="user_id" 
+          bindtap="onPlayerTap" 
+          data-user="{{item}}"
+        >
+          <!-- 头像/代用字头像 -->
+          <view class="player-avatar-box flex-center">
+            <image class="player-avatar" src="{{item.avatar_url}}" mode="aspectFill" wx:if="{{item.avatar_url}}"></image>
+            <view class="player-avatar-text flex-center" wx:else>
+              {{item.nickname[0] || '?'}}
+            </view>
+          </view>
+          
+          <!-- 昵称与得分 -->
+          <view class="player-info-box flex-column">
+            <text class="player-nickname ellipsis">{{item.nickname}}</text>
+            <text class="player-score {{item.score > 0 ? 'score-positive' : (item.score < 0 ? 'score-negative' : 'score-zero')}}">
+              {{item.score > 0 ? '+' + item.score : item.score}} 分
+            </text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 对账流水账 -->
+    <view class="glass-card tx-history-card">
+      <text class="card-section-title">📜 计分流水对账单 (最近50条)</text>
+      <view class="tx-list" style="margin-top: 20rpx;">
+        <view class="tx-item justify-between align-center" wx:for="{{transactions}}" wx:key="id">
+          <view class="tx-detail-box flex-column">
+            <view class="tx-flow align-center">
+              <text class="tx-user-name">{{item.from_nickname}}</text>
+              <text class="tx-arrow">➔</text>
+              <text class="tx-user-name text-green-glow">{{item.to_nickname}}</text>
+            </view>
+            <text class="tx-time">{{item.created_at}}</text>
+          </view>
+          
+          <view class="tx-right-box align-center">
+            <view class="tx-scores flex-column align-end">
+              <text class="tx-amount">+{{item.amount}} 分</text>
+              <text class="tx-tea-detail" wx:if="{{item.tea_deducted > 0}}">(扣茶水 {{item.tea_deducted}})</text>
+            </view>
+            <!-- 撤销按钮 -->
+            <view class="tx-undo-btn flex-center" catchtap="onUndoTap" data-tx="{{item}}">
+              <van-icon name="revoke" size="16px" color="#ee0a24" />
+            </view>
+          </view>
+        </view>
+        <view class="tx-empty flex-center" wx:if="{{transactions.length === 0}}">
+          <text>暂无计分记录，点击上方玩家头像开始吧~</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 弹窗 1：出示房间码弹窗 -->
+  <van-popup
+    show="{{ showQRCode }}"
+    round
+    bind:close="onCloseQRCode"
+    custom-style="width: 80%; padding: 40rpx; border-radius: 30rpx;"
+  >
+    <view class="qr-popup-content flex-column flex-center">
+      <text class="popup-title">房间二维码</text>
+      <text class="popup-subtitle">让亲友扫码直接加入游戏</text>
+      
+      <!-- 使用第三方 API 动态绘制的高清二维码图片 -->
+      <image class="qr-code-img" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={{qrCodeUrl}}" mode="aspectFit"></image>
+      
+      <view class="room-code-display flex-column flex-center" bindtap="copyRoomCode">
+        <text class="code-label">房间号</text>
+        <text class="code-number">{{roomCode}}</text>
+        <text class="copy-tip">📋 点击复制房间号</text>
+      </view>
+      
+      <van-button custom-class="btn-green" style="width: 80%; margin-top: 30rpx;" bindtap="onCloseQRCode">知道了</van-button>
+    </view>
+  </van-popup>
+
+  <!-- 弹窗 2：设置茶水钱弹窗 -->
+  <van-popup
+    show="{{ showTeaModal }}"
+    round
+    position="bottom"
+    bind:close="onCloseTeaPopup"
+    custom-style="padding-bottom: 40rpx; border-radius: 40rpx 40rpx 0 0;"
+  >
+    <view class="tea-popup-content flex-column" style="padding: 40rpx;">
+      <text class="popup-title" style="margin-bottom: 30rpx;">🍵 设置茶水规则</text>
+      
+      <van-field
+        label="总茶水钱"
+        type="number"
+        placeholder="设置收满多少分下课"
+        value="{{inputTotalTea}}"
+        bind:change="onTotalTeaChange"
+        input-align="right"
+      />
+      <van-field
+        label="每笔扣除"
+        type="number"
+        placeholder="每笔带茶水交易扣除的分数"
+        value="{{inputPerTxTea}}"
+        bind:change="onPerTxTeaChange"
+        input-align="right"
+      />
+      
+      <view class="popup-actions flex-row justify-between" style="margin-top: 40rpx;">
+        <van-button custom-class="btn-outline" style="width: 45%;" bindtap="onCloseTeaPopup">取消</van-button>
+        <van-button custom-class="btn-green" style="width: 45%;" bindtap="submitTeaConfig">确认设置</van-button>
+      </view>
+    </view>
+  </van-popup>
+
+  <!-- 弹窗 3：记分弹窗 -->
+  <van-popup
+    show="{{ showScoreModal }}"
+    round
+    position="bottom"
+    bind:close="onCloseScorePopup"
+    custom-style="padding-bottom: 40rpx; border-radius: 40rpx 40rpx 0 0;"
+  >
+    <view class="score-popup-content flex-column" style="padding: 40rpx;">
+      <text class="popup-title" style="margin-bottom: 20rpx;">✏️ 给 [{{selectedPlayer.nickname}}] 记分</text>
+      
+      <!-- 选择付分人 (谁是付钱的人) -->
+      <view class="payer-selection-box flex-column" style="margin-bottom: 30rpx;">
+        <text class="selection-label">谁给他/她付分？(单选)</text>
+        <scroll-view class="payers-scroll flex-row" scroll-x="true">
+          <view 
+            class="payer-option-card flex-center {{selectedPayerId === item.user_id ? 'active' : ''}}" 
+            wx:for="{{payers}}" 
+            wx:key="user_id"
+            bindtap="selectPayer"
+            data-id="{{item.user_id}}"
+          >
+            <text class="payer-opt-name ellipsis">{{item.nickname}}</text>
+          </view>
+        </scroll-view>
+      </view>
+
+      <!-- 分数输入 -->
+      <van-field
+        label="分值"
+        type="number"
+        placeholder="请输入大于0的分数"
+        value="{{inputScore}}"
+        bind:change="onScoreValueChange"
+        input-align="right"
+        size="large"
+      />
+
+      <!-- 茶水开关 (当房间茶水每笔扣除数大于0且没扣满时显示) -->
+      <view class="tea-switch-row justify-between align-center" wx:if="{{roomInfo.tea_money_per_tx > 0 && roomInfo.accumulated_tea_money < roomInfo.total_tea_money}}">
+        <view class="flex-column">
+          <text class="switch-title">是否扣除茶水钱</text>
+          <text class="switch-desc">开启将从此笔分值中扣除 {{roomInfo.tea_money_per_tx}} 分计入茶水</text>
+        </view>
+        <van-switch checked="{{ deductTeaChecked }}" active-color="#06d6a0" bind:change="onTeaSwitchChange" />
+      </view>
+
+      <view class="popup-actions flex-row justify-between" style="margin-top: 40rpx;">
+        <van-button custom-class="btn-outline" style="width: 45%;" bindtap="onCloseScorePopup">取消</van-button>
+        <van-button custom-class="btn-blue" style="width: 45%;" disabled="{{!selectedPayerId || !inputScore}}" bindtap="submitScore">确认计分</van-button>
+      </view>
+    </view>
+  </van-popup>
+
+  <!-- 弹窗 4：结算大赢家海报弹窗 (结算后不可关闭，只提供返回首页按钮) -->
+  <van-popup
+    show="{{ showSettleReport }}"
+    round
+    custom-style="width: 85%; padding: 40rpx; border-radius: 40rpx; background: radial-gradient(circle at 50% 30%, #0d2822 0%, #050d0a 100%);"
+  >
+    <view class="settle-popup-content flex-column flex-center">
+      <view class="crown-box flex-center">👑</view>
+      <text class="settle-title">游戏结算单</text>
+      
+      <!-- MVP 荣誉位 -->
+      <view class="mvp-box flex-column flex-center" wx:if="{{mvpPlayer}}">
+        <view class="mvp-avatar-box flex-center">
+          <image class="mvp-avatar" src="{{mvpPlayer.avatar_url}}" wx:if="{{mvpPlayer.avatar_url}}"></image>
+          <view class="mvp-avatar-text flex-center" wx:else>{{mvpPlayer.nickname[0]}}</view>
+          <text class="mvp-badge">MVP</text>
+        </view>
+        <text class="mvp-name">{{mvpPlayer.nickname}}</text>
+        <text class="mvp-score">+{{mvpPlayer.score}} 分</text>
+      </view>
+
+      <!-- 排行榜列表 -->
+      <view class="rank-list" style="width: 100%; margin-top: 30rpx;">
+        <view class="rank-item justify-between align-center" wx:for="{{sortedPlayers}}" wx:key="user_id">
+          <view class="align-center">
+            <text class="rank-number {{index === 0 ? 'first' : (index === 1 ? 'second' : (index === 2 ? 'third' : ''))}}">{{index + 1}}</text>
+            <text class="rank-name ellipsis">{{item.nickname}}</text>
+          </view>
+          <text class="rank-score {{item.score > 0 ? 'score-positive' : (item.score < 0 ? 'score-negative' : 'score-zero')}}">
+            {{item.score > 0 ? '+' + item.score : item.score}} 分
+          </text>
+        </view>
+      </view>
+
+      <!-- 茶水累计最终播报 -->
+      <view class="settle-tea-summary flex-center" wx:if="{{roomInfo.accumulated_tea_money > 0}}">
+        <text>🍵 本局共收取茶水钱: {{roomInfo.accumulated_tea_money}} 分</text>
+      </view>
+
+      <van-button custom-class="btn-green" style="width: 90%; margin-top: 40rpx;" bindtap="exitRoomToHome">返回游戏大厅</van-button>
+    </view>
+  </van-popup>
+</view>

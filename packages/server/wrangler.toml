@@ -1,0 +1,8 @@
+name = "wx-score-room"
+main = "build/worker/index.js"
+compatibility_date = "2023-05-18"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "wx_score_room_db"
+database_id = "2858e78d-5e9a-40bd-8593-68ee660e7187"
