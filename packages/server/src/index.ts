@@ -304,10 +304,14 @@ app.post('/api/room/create', async (c) => {
         .run();
     }
 
-    // 随机生成 6 位不重复的房间号
+    // 随机生成 6 位不重复的房间号 (大写英文+数字，排除容易看错混淆的 0, O, 1, I)
     let roomCode = '';
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     for (let i = 0; i < 10; i++) {
-      const tempCode = Math.floor(100000 + Math.random() * 900000).toString();
+      let tempCode = '';
+      for (let j = 0; j < 6; j++) {
+        tempCode += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
       const existing = await c.env.DB
         .prepare('SELECT id FROM rooms WHERE room_code = ?')
         .bind(tempCode)

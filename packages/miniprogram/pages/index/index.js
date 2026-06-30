@@ -8,7 +8,8 @@ Page({
     nickname: '',
     showJoinModal: false,
     roomCodeInput: '',
-    inputFocus: false
+    inputFocus: false,
+    keyboardHeight: 0
   },
 
   onLoad: function (options) {
@@ -231,7 +232,22 @@ Page({
   onCloseJoinPopup: function () {
     this.setData({
       showJoinModal: false,
-      inputFocus: false
+      inputFocus: false,
+      keyboardHeight: 0
+    });
+  },
+
+  // 监听键盘高度聚焦
+  onInputFocus: function (e) {
+    this.setData({
+      keyboardHeight: e.detail.height || 0
+    });
+  },
+
+  // 监听键盘高度失焦
+  onInputBlur: function () {
+    this.setData({
+      keyboardHeight: 0
     });
   },
 
@@ -241,7 +257,7 @@ Page({
 
   // 监听隐藏的真实输入框
   onRoomCodeInput: function (e) {
-    const val = e.detail.value;
+    const val = e.detail.value.toUpperCase();
     this.setData({ roomCodeInput: val });
     
     // 输入满6位自动提交
