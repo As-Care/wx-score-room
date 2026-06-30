@@ -4,20 +4,48 @@
     <view class="navbar-back flex-center" bindtap="goBack">
       <van-icon name="arrow-left" color="#1e2a27" size="18px" />
     </view>
-    <view class="navbar-title">📊 战绩大厅</view>
+    <view class="navbar-title">📊 战绩中心</view>
   </view>
 
   <view class="content-wrapper" style="padding-top: {{statusBarHeight + navBarHeight + 10}}px;">
     
     <!-- 个人名片 -->
-    <view class="glass-card user-badge-card flex-row align-center">
-      <view class="user-avatar-box flex-center">
-        <image class="user-avatar" src="{{userInfo.avatar_url}}" mode="aspectFill" wx:if="{{userInfo.avatar_url}}"></image>
-        <view class="user-avatar-text flex-center" wx:else>{{userInfo.nickname[0] || '?'}}</view>
+    <view class="glass-card user-badge-card flex-column">
+      <!-- 上半部分：头像、名字和总积分 -->
+      <view class="user-card-top flex-row align-center width-100">
+        <view class="user-avatar-box flex-center">
+          <image class="user-avatar" src="{{userInfo.avatar_url}}" mode="aspectFill" wx:if="{{userInfo.avatar_url}}"></image>
+          <view class="user-avatar-text flex-center" wx:else>{{userInfo.nickname[0] || '?'}}</view>
+        </view>
+        <view class="user-info flex-column flex-1">
+          <text class="user-nickname">{{userInfo.nickname || '未登录'}}</text>
+          <text class="user-register-time">打牌计分房专属游戏玩家</text>
+        </view>
+        <view class="user-total-score flex-column align-end">
+          <text class="total-score-label">历史总积分</text>
+          <text class="total-score-value {{totalScore >= 0 ? 'score-green' : 'score-red'}}">
+            {{totalScore >= 0 ? '+' : ''}}{{totalScore}}
+          </text>
+        </view>
       </view>
-      <view class="user-info flex-column">
-        <text class="user-nickname">{{userInfo.nickname || '未登录'}}</text>
-        <text class="user-register-time">打牌计分房专属游戏玩家</text>
+
+      <!-- 下半部分分割线 -->
+      <view class="card-divider"></view>
+
+      <!-- 下半部分：赢输胜率统计 -->
+      <view class="user-card-bottom flex-row justify-between width-100">
+        <view class="stat-item">
+          <text class="stat-label">赢</text>
+          <text class="stat-value text-green">{{wins}} 局</text>
+        </view>
+        <view class="stat-item">
+          <text class="stat-label">输</text>
+          <text class="stat-value text-red">{{losses}} 局</text>
+        </view>
+        <view class="stat-item">
+          <text class="stat-label">胜率</text>
+          <text class="stat-value text-blue">{{winRate}}%</text>
+        </view>
       </view>
     </view>
 

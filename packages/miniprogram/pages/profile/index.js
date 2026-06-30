@@ -7,7 +7,11 @@ Page({
     userInfo: null,
     activeTab: 0, // 0: 历史对局, 1: 我的战友
     historyRooms: [],
-    friendsList: []
+    friendsList: [],
+    wins: 0,
+    losses: 0,
+    winRate: 0,
+    totalScore: 0
   },
 
   onLoad: function () {
@@ -40,9 +44,20 @@ Page({
         return item;
       });
 
+      // 计算局数统计与总积分
+      const wins = formattedHistory.filter(item => item.final_score > 0).length;
+      const losses = formattedHistory.filter(item => item.final_score < 0).length;
+      const total = formattedHistory.length;
+      const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+      const totalScore = formattedHistory.reduce((sum, item) => sum + (item.final_score || 0), 0);
+
       this.setData({
         historyRooms: formattedHistory,
-        friendsList: data.friends || []
+        friendsList: data.friends || [],
+        wins: wins,
+        losses: losses,
+        winRate: winRate,
+        totalScore: totalScore
       });
     }).catch(err => {
       console.error('拉取战绩数据失败', err);

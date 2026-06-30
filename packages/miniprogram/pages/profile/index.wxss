@@ -12,9 +12,18 @@
 /* 个人名片 */
 .user-badge-card {
   margin-top: 15rpx;
-  gap: 30rpx;
+  padding: 30rpx;
   background: linear-gradient(135deg, rgba(0, 150, 199, 0.06) 0%, rgba(11, 155, 119, 0.04) 100%);
   border: 1px solid rgba(0, 150, 199, 0.12);
+  display: flex;
+  flex-direction: column;
+}
+
+.user-card-top {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
 }
 
 .user-avatar-box {
@@ -24,6 +33,8 @@
   overflow: hidden;
   border: 2px solid rgba(0, 150, 199, 0.25);
   background-color: rgba(0, 0, 0, 0.02);
+  margin-right: 24rpx;
+  flex-shrink: 0;
 }
 
 .user-avatar {
@@ -56,6 +67,79 @@
   font-size: 24rpx;
   color: var(--text-secondary);
   margin-top: 6rpx;
+}
+
+.user-total-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.total-score-label {
+  font-size: 20rpx;
+  color: var(--text-secondary);
+  margin-bottom: 4rpx;
+}
+
+.total-score-value {
+  font-size: 38rpx;
+  font-weight: bold;
+}
+
+.score-green {
+  color: var(--theme-color-green);
+  text-shadow: 0 0 10rpx rgba(6, 214, 160, 0.15);
+}
+
+.score-red {
+  color: #ff6b6b;
+  text-shadow: 0 0 10rpx rgba(255, 107, 107, 0.15);
+}
+
+.card-divider {
+  height: 1px;
+  background: rgba(0, 150, 199, 0.08);
+  width: 100%;
+  margin: 24rpx 0 20rpx 0;
+}
+
+.user-card-bottom {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 10rpx;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 22rpx;
+  color: var(--text-secondary);
+  margin-bottom: 6rpx;
+}
+
+.stat-value {
+  font-size: 28rpx;
+  font-weight: bold;
+}
+
+.text-green {
+  color: var(--theme-color-green);
+}
+
+.text-red {
+  color: #ff6b6b;
+}
+
+.text-blue {
+  color: var(--theme-color-blue);
 }
 
 /* Tab 切换栏 */
