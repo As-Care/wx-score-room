@@ -36,7 +36,7 @@
       <!-- 茶水收齐徽章 -->
       <view class="tea-completed-badge flex-center" wx:if="{{roomInfo.total_tea_money > 0 && roomInfo.accumulated_tea_money >= roomInfo.total_tea_money}}">
         <van-icon name="success" size="14px" style="margin-right: 6rpx;" />
-        <text>茶水已收齐，下课！</text>
+        <text>茶水已收齐！</text>
       </view>
     </view>
 
@@ -155,9 +155,9 @@
       <text class="popup-title" style="margin-bottom: 30rpx;">🍵 设置茶水规则</text>
       
       <van-field
-        label="总茶水钱"
+        label="总茶水费"
         type="number"
-        placeholder="设置收满多少分下课"
+        placeholder="设置收满多少分"
         value="{{inputTotalTea}}"
         bind:change="onTotalTeaChange"
         input-align="right"
@@ -223,7 +223,7 @@
       <!-- 茶水开关 (当房间茶水每笔扣除数大于0且没扣满时显示) -->
       <view class="tea-switch-row justify-between align-center" wx:if="{{roomInfo.tea_money_per_tx > 0 && roomInfo.accumulated_tea_money < roomInfo.total_tea_money}}">
         <view class="flex-column">
-          <text class="switch-title">是否扣除茶水钱</text>
+          <text class="switch-title">是否扣除茶水费</text>
           <text class="switch-desc">开启将从此笔分值中扣除 {{roomInfo.tea_money_per_tx}} 分计入茶水</text>
         </view>
         <van-switch checked="{{ deductTeaChecked }}" active-color="#06d6a0" bind:change="onTeaSwitchChange" />
@@ -276,7 +276,7 @@
 
       <!-- 茶水累计最终播报 -->
       <view class="settle-tea-summary flex-center" wx:if="{{roomInfo.accumulated_tea_money > 0}}">
-        <text>🍵 本局共收取茶水钱: {{roomInfo.accumulated_tea_money}} 分</text>
+        <text>🍵 本局共收取茶水费: {{roomInfo.accumulated_tea_money}} 分</text>
       </view>
 
       <van-button custom-class="btn-green" style="width: 90%; margin-top: 40rpx;" bindtap="exitRoomToHome">返回游戏大厅</van-button>

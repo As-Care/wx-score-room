@@ -112,6 +112,16 @@ app.post('/api/user/login', async (c) => {
   }
 });
 
+// 1.1 获取当前登录用户信息
+app.get('/api/user/me', async (c) => {
+  try {
+    const user = await authenticate(c.req.raw, c.env.DB);
+    return jsonOk(user);
+  } catch (err: any) {
+    return jsonErr(401, err.message || '未授权');
+  }
+});
+
 // 2. 更新个人信息
 app.post('/api/user/update', async (c) => {
   try {

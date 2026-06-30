@@ -1,7 +1,7 @@
 <view class="page-container index-page">
   <!-- 自定义高端导航栏 -->
   <view class="custom-navbar" style="height: {{statusBarHeight + navBarHeight}}px; padding-top: {{statusBarHeight}}px;">
-    <view class="navbar-title">🎲 微信计分房</view>
+    <view class="navbar-title">🏠 打牌计分房</view>
   </view>
 
   <!-- 页面主内容，防止被导航栏遮挡 -->

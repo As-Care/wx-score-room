@@ -25,18 +25,44 @@ Page({
     });
   },
 
-  // 静默登录并初始化用户信息
+  // 静默登录并初始化用户信息 (优先读取缓存 Token 以防开发降级时 OpenID 重新生成)
   initUserSession: function () {
     return new Promise((resolve) => {
-      const userInfo = app.globalData.userInfo;
-      if (userInfo) {
-        this.setData({
-          avatarUrl: userInfo.avatar_url || '',
-          nickname: userInfo.nickname || ''
+      const cachedToken = app.globalData.token || wx.getStorageSync('token');
+      
+      if (cachedToken) {
+        // 1. 本地有凭证，直接向后端获取已存的用户数据，这可以避免微信 code 每次编译都不同导致降级重新生成新 openid 的问题
+        app.request({
+          url: '/api/user/me',
+          method: 'GET'
+        }).then(user => {
+          app.globalData.token = cachedToken;
+          app.globalData.userInfo = user;
+          wx.setStorageSync('userInfo', user);
+          
+          this.setData({
+            avatarUrl: user.avatar_url || '',
+            nickname: user.nickname || ''
+          });
+          resolve();
+        }).catch(() => {
+          // 如果凭证失效了，清空并重新走微信登录获取 openid
+          wx.removeStorageSync('token');
+          wx.removeStorageSync('userInfo');
+          app.globalData.token = '';
+          app.globalData.userInfo = null;
+          this.executeFreshLogin().then(resolve);
         });
+      } else {
+        // 2. 本地无凭证，走微信正常 login 流程
+        this.executeFreshLogin().then(resolve);
       }
+    });
+  },
 
-      // 无论缓存有无，均静默登录一次获取/刷新 token
+  // 微信新鲜登录换取凭证
+  executeFreshLogin: function () {
+    return new Promise((resolve) => {
       app.login().then(user => {
         this.setData({
           avatarUrl: user.avatar_url || '',
@@ -44,7 +70,7 @@ Page({
         });
         resolve();
       }).catch(() => {
-        // 如果登录失败且本地没有 token，则伪造一个开发 token 保证流程可用
+        // 本地没有 Token 且登录失败，开发假数据降级
         if (!app.globalData.token) {
           const devToken = 'test_' + Math.random().toString(36).substring(2, 8);
           app.login(devToken).then(user => {

@@ -2,7 +2,7 @@
   <!-- 自定义高端导航栏 -->
   <view class="custom-navbar" style="height: {{statusBarHeight + navBarHeight}}px; padding-top: {{statusBarHeight}}px;">
     <view class="navbar-back flex-center" bindtap="goBack">
-      <van-icon name="arrow-left" color="#ffffff" size="18px" />
+      <van-icon name="arrow-left" color="#1e2a27" size="18px" />
     </view>
     <view class="navbar-title">📊 战绩大厅</view>
   </view>
@@ -17,7 +17,7 @@
       </view>
       <view class="user-info flex-column">
         <text class="user-nickname">{{userInfo.nickname || '未登录'}}</text>
-        <text class="user-register-time">微信计分房专属游戏玩家</text>
+        <text class="user-register-time">打牌计分房专属游戏玩家</text>
       </view>
     </view>
 
