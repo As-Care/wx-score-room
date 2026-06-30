@@ -160,9 +160,8 @@ app.post('/api/upload', async (c) => {
       httpMetadata: { contentType: file.type || 'image/jpeg' }
     });
 
-    // 动态生成本 Worker 作为中间代理的访问路径，免去配置 R2 公网域名
-    const requestUrl = new URL(c.req.url);
-    const avatarUrl = `${requestUrl.origin}/api/avatar/${key}`;
+    // 使用你给存储桶配置的自定义域名访问头像，享受高速 CDN 缓存并节省 Worker 额度
+    const avatarUrl = `https://score-room.ashang.cloud/${key}`;
 
     return jsonOk({ avatarUrl });
   } catch (err: any) {
