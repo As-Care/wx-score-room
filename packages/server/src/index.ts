@@ -406,7 +406,7 @@ app.post('/api/room/set-tea', async (c) => {
   }
 });
 
-// 8. 记分 (零和交易事务及茶水自动扣除)
+// 8. 记分 (支持普通记分和自己交茶水费，兼具零和事务及撤销兼容)
 app.post('/api/room/score', async (c) => {
   try {
     await authenticate(c.req.raw, c.env.DB);
@@ -414,10 +414,7 @@ app.post('/api/room/score', async (c) => {
     const { room_id, from_user_id, to_user_id, amount, deduct_tea } = body;
 
     if (amount <= 0) {
-      return jsonErr(400, '记分值必须大于0');
-    }
-    if (from_user_id === to_user_id) {
-      return jsonErr(400, '不能给自己记分');
+      return jsonErr(400, '输入分值必须大于0');
     }
 
     const room = await c.env.DB
@@ -432,44 +429,74 @@ app.post('/api/room/score', async (c) => {
       return jsonErr(403, '房间对局已结算锁定');
     }
 
-    // 计算应扣除的茶水钱
-    let teaDeducted = 0;
-    if (deduct_tea && room.tea_money_per_tx > 0) {
-      const remainingTea = room.total_tea_money - room.accumulated_tea_money;
-      if (remainingTea > 0) {
-        teaDeducted = Math.min(room.tea_money_per_tx, remainingTea, amount);
+    // 区分是“纯给茶水费（自己点自己头像）”还是“普通记分”
+    const isPureTea = (to_user_id === 0 || to_user_id === from_user_id);
+
+    if (isPureTea) {
+      // 1. 如果是缴纳茶水费，校验茶水费是否已满或不需要
+      if (room.total_tea_money <= 0) {
+        return jsonErr(400, '本房间未设置茶水规则，无需缴纳');
       }
+      if (room.accumulated_tea_money >= room.total_tea_money) {
+        return jsonErr(400, '本房间茶水费已收齐，无需缴纳');
+      }
+
+      // 计算能交的最大值，防止超出总额
+      const remainingTea = room.total_tea_money - room.accumulated_tea_money;
+      const actualTea = Math.min(amount, remainingTea);
+
+      const statements = [
+        // 缴纳人扣除分值 (即使分数为0扣后变负数也允许)
+        c.env.DB.prepare('UPDATE room_users SET score = score - ? WHERE room_id = ? AND user_id = ?')
+          .bind(actualTea, room_id, from_user_id),
+        // 累加房间茶水
+        c.env.DB.prepare('UPDATE rooms SET accumulated_tea_money = accumulated_tea_money + ?, version = version + 1 WHERE id = ?')
+          .bind(actualTea, room_id),
+        // 流水记录：to_user_id 记录为 0 代表流向茶水池，tea_deducted 等于实际缴纳值
+        c.env.DB.prepare('INSERT INTO transactions (room_id, from_user_id, to_user_id, amount, tea_deducted, is_undone) VALUES (?, ?, 0, ?, ?, 0)')
+          .bind(room_id, from_user_id, actualTea, actualTea)
+      ];
+
+      await c.env.DB.batch(statements);
+      return jsonOk({ status: 'ok' });
+    } else {
+      // 2. 普通记分（由 from_user_id 付分给 to_user_id）
+      // 计算应扣除的茶水钱
+      let teaDeducted = 0;
+      if (deduct_tea && room.tea_money_per_tx > 0) {
+        const remainingTea = room.total_tea_money - room.accumulated_tea_money;
+        if (remainingTea > 0) {
+          teaDeducted = Math.min(room.tea_money_per_tx, remainingTea, amount);
+        }
+      }
+
+      const finalScoreChange = amount - teaDeducted;
+
+      const statements = [
+        // 付分人扣分
+        c.env.DB.prepare('UPDATE room_users SET score = score - ? WHERE room_id = ? AND user_id = ?')
+          .bind(amount, room_id, from_user_id),
+        // 得分人得分
+        c.env.DB.prepare('UPDATE room_users SET score = score + ? WHERE room_id = ? AND user_id = ?')
+          .bind(finalScoreChange, room_id, to_user_id),
+        // 记录记分交易流水
+        c.env.DB.prepare('INSERT INTO transactions (room_id, from_user_id, to_user_id, amount, tea_deducted, is_undone) VALUES (?, ?, ?, ?, ?, 0)')
+          .bind(room_id, from_user_id, to_user_id, amount, teaDeducted),
+        // 房间版本递增
+        c.env.DB.prepare('UPDATE rooms SET version = version + 1 WHERE id = ?')
+          .bind(room_id)
+      ];
+
+      if (teaDeducted > 0) {
+        statements.push(
+          c.env.DB.prepare('UPDATE rooms SET accumulated_tea_money = accumulated_tea_money + ? WHERE id = ?')
+            .bind(teaDeducted, room_id)
+        );
+      }
+
+      await c.env.DB.batch(statements);
+      return jsonOk({ status: 'ok' });
     }
-
-    const finalScoreChange = amount - teaDeducted;
-
-    // 使用 D1 Batch 原子性批处理执行，确保记分事务零和守恒
-    const statements = [
-      // 1. 付分人扣分
-      c.env.DB.prepare('UPDATE room_users SET score = score - ? WHERE room_id = ? AND user_id = ?')
-        .bind(amount, room_id, from_user_id),
-      // 2. 得分人得分
-      c.env.DB.prepare('UPDATE room_users SET score = score + ? WHERE room_id = ? AND user_id = ?')
-        .bind(finalScoreChange, room_id, to_user_id),
-      // 3. 记录记分交易流水
-      c.env.DB.prepare('INSERT INTO transactions (room_id, from_user_id, to_user_id, amount, tea_deducted, is_undone) VALUES (?, ?, ?, ?, ?, 0)')
-        .bind(room_id, from_user_id, to_user_id, amount, teaDeducted),
-      // 4. 房间版本递增
-      c.env.DB.prepare('UPDATE rooms SET version = version + 1 WHERE id = ?')
-        .bind(room_id)
-    ];
-
-    // 5. 如果产生茶水，累加茶水蓄水池
-    if (teaDeducted > 0) {
-      statements.push(
-        c.env.DB.prepare('UPDATE rooms SET accumulated_tea_money = accumulated_tea_money + ? WHERE id = ?')
-          .bind(teaDeducted, room_id)
-      );
-    }
-
-    await c.env.DB.batch(statements);
-
-    return jsonOk({ status: 'ok' });
   } catch (err: any) {
     return jsonErr(401, err.message || '操作失败');
   }
@@ -515,18 +542,23 @@ app.post('/api/room/undo', async (c) => {
       // 1. 原付分人积分退回
       c.env.DB.prepare('UPDATE room_users SET score = score + ? WHERE room_id = ? AND user_id = ?')
         .bind(originalAmount, room_id, tx.from_user_id),
-      // 2. 原得分人积分扣除
-      c.env.DB.prepare('UPDATE room_users SET score = score - ? WHERE room_id = ? AND user_id = ?')
-        .bind(finalScoreChange, room_id, tx.to_user_id),
-      // 3. 标记流水状态为已撤销
+      // 2. 标记流水状态为已撤销
       c.env.DB.prepare('UPDATE transactions SET is_undone = 1 WHERE id = ?')
         .bind(transaction_id),
-      // 4. 版本递增
+      // 3. 版本递增
       c.env.DB.prepare('UPDATE rooms SET version = version + 1 WHERE id = ?')
         .bind(room_id)
     ];
 
-    // 5. 如果当初扣了茶水，回滚茶水钱
+    // 如果原交易中存在得分人 (to_user_id > 0)，原得分人扣除对应积分
+    if (tx.to_user_id && tx.to_user_id > 0) {
+      statements.push(
+        c.env.DB.prepare('UPDATE room_users SET score = score - ? WHERE room_id = ? AND user_id = ?')
+          .bind(finalScoreChange, room_id, tx.to_user_id)
+      );
+    }
+
+    // 如果当初扣了茶水，回滚茶水钱
     if (teaDeducted > 0) {
       statements.push(
         c.env.DB.prepare('UPDATE rooms SET accumulated_tea_money = accumulated_tea_money - ? WHERE id = ?')
@@ -586,11 +618,11 @@ app.get('/api/room/poll', async (c) => {
     const transactions = await c.env.DB
       .prepare(
         'SELECT t.id, t.from_user_id, u1.nickname as from_nickname, \
-                t.to_user_id, u2.nickname as to_nickname, \
+                t.to_user_id, COALESCE(u2.nickname, \'茶水金库\') as to_nickname, \
                 t.amount, t.tea_deducted, t.created_at \
          FROM transactions t \
          JOIN users u1 ON t.from_user_id = u1.id \
-         JOIN users u2 ON t.to_user_id = u2.id \
+         LEFT JOIN users u2 ON t.to_user_id = u2.id \
          WHERE t.room_id = ? AND t.is_undone = 0 \
          ORDER BY t.id DESC'
       )

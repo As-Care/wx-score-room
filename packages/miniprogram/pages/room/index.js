@@ -33,7 +33,8 @@ Page({
 
     // 结算数据
     sortedPlayers: [],
-    mvpPlayer: null
+    mvpPlayer: null,
+    myUserId: 0
   },
 
   intervalId: null, // 用于轮询的定时器 ID
@@ -46,7 +47,8 @@ Page({
       roomId: parseInt(options.room_id) || 0,
       roomCode: options.room_code || '',
       isOwner: options.is_owner === 'true',
-      qrCodeUrl: ''
+      qrCodeUrl: '',
+      myUserId: app.globalData.userInfo ? app.globalData.userInfo.id : 0
     });
 
     // 2. 立即拉取一次房间数据
@@ -113,7 +115,8 @@ Page({
           localVersion: room.version,
           teaProgress: progress,
           inputTotalTea: room.total_tea_money || '',
-          inputPerTxTea: room.tea_money_per_tx || ''
+          inputPerTxTea: room.tea_money_per_tx || '',
+          myUserId: app.globalData.userInfo ? app.globalData.userInfo.id : 0
         });
 
         // 核心检查：如果房间已结算，自动停止轮询并弹出结算大赢家海报
@@ -266,6 +269,22 @@ Page({
 
   // 房主发起结算房间并结束游戏
   confirmSettleRoom: function () {
+    // 拦截：如果未产生计分流水（对局没有发生过分值变化）
+    if (this.data.transactions.length === 0) {
+      wx.showModal({
+        title: '结算提示',
+        content: '当前房间未产生分值，无法生成结算单。是否直接返回游戏大厅？',
+        confirmText: '返回大厅',
+        cancelText: '留在房间',
+        success: (res) => {
+          if (res.confirm) {
+            this.exitRoomToHome();
+          }
+        }
+      });
+      return;
+    }
+
     wx.showModal({
       title: '结算并结束',
       content: '结束游戏后，房间内所有人的积分将被锁定封盘，并生成最终成绩单，确认结算？',
@@ -292,36 +311,38 @@ Page({
     // 如果房间已经结算，禁止再记分
     if (this.data.roomInfo.status === 1) return;
 
-    // 过滤出除得分人之外的其他玩家作为候选“付分人”
-    const payers = this.data.players.filter(p => p.user_id !== clickedPlayer.user_id);
-    
-    if (payers.length === 0) {
-      wx.showToast({
-        title: '房间内人数不足，请邀请好友加入',
-        icon: 'none'
-      });
-      return;
-    }
+    const myId = this.data.myUserId;
+    const isPureTea = clickedPlayer.user_id === myId; // 判断点击的是否是当前用户自己 (缴纳茶水费)
 
-    // 默认选择列表中的第一个为付分人
-    this.setData({
-      selectedPlayer: clickedPlayer,
-      payers: payers,
-      selectedPayerId: payers[0].user_id,
-      inputScore: '',
-      deductTeaChecked: this.data.roomInfo.tea_money_per_tx > 0,
-      showScoreModal: true
-    });
+    if (isPureTea) {
+      // 1. 如果是缴纳茶水费，找到自己在列表里的最新积分
+      const myPlayer = this.data.players.find(p => p.user_id === myId) || clickedPlayer;
+      
+      this.setData({
+        selectedPlayer: clickedPlayer,
+        isPureTea: true,
+        myCurrentScore: myPlayer.score || 0,
+        selectedPayerId: myId,
+        inputScore: '',
+        deductTeaChecked: false, // 缴纳茶水不显示扣除茶水开关
+        showScoreModal: true
+      });
+    } else {
+      // 2. 如果点击的是其他玩家，默认且强制指定由我（当前用户）给他付分
+      this.setData({
+        selectedPlayer: clickedPlayer,
+        isPureTea: false,
+        selectedPayerId: myId,
+        inputScore: '',
+        // 如果茶水没满，默认开启扣茶水费
+        deductTeaChecked: this.data.roomInfo.tea_money_per_tx > 0 && this.data.roomInfo.accumulated_tea_money < this.data.roomInfo.total_tea_money,
+        showScoreModal: true
+      });
+    }
   },
 
   onCloseScorePopup: function () {
     this.setData({ showScoreModal: false });
-  },
-
-  selectPayer: function (e) {
-    this.setData({
-      selectedPayerId: e.currentTarget.dataset.id
-    });
   },
 
   onScoreValueChange: function (e) {
@@ -340,27 +361,61 @@ Page({
       return;
     }
 
-    if (!this.data.selectedPayerId) {
-      wx.showToast({ title: '请选择付分人', icon: 'none' });
+    const myId = this.data.myUserId;
+    if (!myId) {
+      wx.showToast({ title: '登录信息已失效，请重新登录', icon: 'none' });
       return;
     }
 
-    app.request({
-      url: '/api/room/score',
-      method: 'POST',
-      data: {
-        room_id: this.data.roomId,
-        from_user_id: this.data.selectedPayerId,
-        to_user_id: this.data.selectedPlayer.user_id,
-        amount: amount,
-        deduct_tea: this.data.deductTeaChecked
-      },
-      loading: true,
-      loadingTitle: '正在记分...'
-    }).then(() => {
-      this.setData({ showScoreModal: false });
-      // 成功后，下一秒的轮询自动更新页面分数
-    }).catch(() => {});
+    // 1. 如果是点击自己（纯交茶水费）
+    if (this.data.isPureTea) {
+      const room = this.data.roomInfo;
+      // 在点击确认时做拦截（允许点击弹起窗，但如果茶水已满或不需要则禁止提交分值）
+      if (room.total_tea_money <= 0) {
+        wx.showToast({ title: '本房间未设置茶水规则，无需缴纳', icon: 'none' });
+        return;
+      }
+      if (room.accumulated_tea_money >= room.total_tea_money) {
+        wx.showToast({ title: '本房间茶水费已收满，无需缴纳', icon: 'none' });
+        return;
+      }
+
+      app.request({
+        url: '/api/room/score',
+        method: 'POST',
+        data: {
+          room_id: this.data.roomId,
+          from_user_id: myId,
+          to_user_id: 0, // to_user_id 传 0 代表纯扣茶水费
+          amount: amount,
+          deduct_tea: false
+        },
+        loading: true,
+        loadingTitle: '正在缴纳茶水...'
+      }).then(() => {
+        this.setData({ showScoreModal: false });
+        // 成功后，下一秒的轮询自动更新页面分数
+      }).catch(() => {});
+
+    } else {
+      // 2. 普通记分（我付分给得分人）
+      app.request({
+        url: '/api/room/score',
+        method: 'POST',
+        data: {
+          room_id: this.data.roomId,
+          from_user_id: myId, // 付款人锁死为自己
+          to_user_id: this.data.selectedPlayer.user_id, // 得分人
+          amount: amount,
+          deduct_tea: this.data.deductTeaChecked
+        },
+        loading: true,
+        loadingTitle: '正在记分...'
+      }).then(() => {
+        this.setData({ showScoreModal: false });
+        // 成功后，下一秒的轮询自动更新页面分数
+      }).catch(() => {});
+    }
   },
 
   // 撤销计分操作

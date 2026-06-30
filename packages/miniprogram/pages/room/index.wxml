@@ -59,29 +59,30 @@
         <text class="section-tip">💡 点击玩家头像可进行计分</text>
       </view>
 
-      <!-- 自适应排版：少于等于4人使用大卡片网格布局，大于4人使用紧凑列表布局 -->
-      <view class="{{players.length <= 4 ? 'players-grid' : 'players-list'}}">
+      <!-- 统一使用卡片网格排版：1/2/4人一排2个，3人及大于4人一排3个 -->
+      <view class="players-grid-container {{ (players.length === 3 || players.length > 4) ? 'grid-cols-3' : 'grid-cols-2' }}">
         <view 
-          class="player-card glass-card {{players.length <= 4 ? '' : 'compact-row'}}" 
+          class="player-card glass-card" 
           wx:for="{{players}}" 
           wx:key="user_id" 
           bindtap="onPlayerTap" 
           data-user="{{item}}"
         >
-          <!-- 头像/代用字头像 -->
-          <view class="player-avatar-box flex-center">
-            <image class="player-avatar" src="{{item.avatar_url}}" mode="aspectFill" wx:if="{{item.avatar_url}}"></image>
-            <view class="player-avatar-text flex-center" wx:else>
-              {{item.nickname[0] || '?'}}
+          <!-- 头像区域（包含挂在头像上方的“我”字标签，彻底剥离头像框防止裁切） -->
+          <view class="player-avatar-container">
+            <view class="me-badge" wx:if="{{item.user_id === myUserId}}">我</view>
+            <view class="player-avatar-box flex-center">
+              <image class="player-avatar" src="{{item.avatar_url}}" mode="aspectFill" wx:if="{{item.avatar_url}}"></image>
+              <view class="player-avatar-text flex-center" wx:else>
+                {{item.nickname[0] || '?'}}
+              </view>
             </view>
           </view>
           
           <!-- 昵称与得分 -->
           <view class="player-info-box flex-column">
-            <text class="player-nickname ellipsis">{{item.nickname}}</text>
-            <text class="player-score {{item.score > 0 ? 'score-positive' : (item.score < 0 ? 'score-negative' : 'score-zero')}}">
-              {{item.score > 0 ? '+' + item.score : item.score}} 分
-            </text>
+            <view class="player-nickname ellipsis">{{item.nickname}}</view>
+            <view class="player-score {{item.score > 0 ? 'score-positive' : (item.score < 0 ? 'score-negative' : 'score-zero')}}">{{item.score > 0 ? '+' + item.score : item.score}} 分</view>
           </view>
         </view>
       </view>
@@ -191,37 +192,24 @@
     custom-style="padding-bottom: 40rpx; border-radius: 40rpx 40rpx 0 0;"
   >
     <view class="score-popup-content flex-column" style="padding: 40rpx;">
-      <text class="popup-title" style="margin-bottom: 20rpx;">✏️ 给 [{{selectedPlayer.nickname}}] 记分</text>
-      
-      <!-- 选择付分人 (谁是付钱的人) -->
-      <view class="payer-selection-box flex-column" style="margin-bottom: 30rpx;">
-        <text class="selection-label">谁给他/她付分？(单选)</text>
-        <scroll-view class="payers-scroll flex-row" scroll-x="true">
-          <view 
-            class="payer-option-card flex-center {{selectedPayerId === item.user_id ? 'active' : ''}}" 
-            wx:for="{{payers}}" 
-            wx:key="user_id"
-            bindtap="selectPayer"
-            data-id="{{item.user_id}}"
-          >
-            <text class="payer-opt-name ellipsis">{{item.nickname}}</text>
-          </view>
-        </scroll-view>
-      </view>
+      <!-- 根据是给自己交茶水还是给别人记分，自适应显示标题 -->
+      <text class="popup-title" style="margin-bottom: 20rpx;">
+        {{isPureTea ? '🍵 缴纳茶水费 (当前分数：' + myCurrentScore + ' 分)' : '✏️ 给【' + selectedPlayer.nickname + '】记分'}}
+      </text>
 
-      <!-- 分数输入 -->
+      <!-- 分数输入：根据记分类型适配 Label 与 Placeholder -->
       <van-field
-        label="分值"
+        label="{{isPureTea ? '缴纳金额' : '分值'}}"
         type="number"
-        placeholder="请输入大于0的分数"
+        placeholder="{{isPureTea ? '输入需要缴纳的茶水费' : '请输入大于0的分数'}}"
         value="{{inputScore}}"
         bind:change="onScoreValueChange"
         input-align="right"
         size="large"
       />
 
-      <!-- 茶水开关 (当房间茶水每笔扣除数大于0且没扣满时显示) -->
-      <view class="tea-switch-row justify-between align-center" wx:if="{{roomInfo.tea_money_per_tx > 0 && roomInfo.accumulated_tea_money < roomInfo.total_tea_money}}">
+      <!-- 茶水开关 (仅在普通给别人记分，且没扣满时显示；纯交茶水时不显示) -->
+      <view class="tea-switch-row justify-between align-center" wx:if="{{!isPureTea && roomInfo.tea_money_per_tx > 0 && roomInfo.accumulated_tea_money < roomInfo.total_tea_money}}">
         <view class="flex-column">
           <text class="switch-title">是否扣除茶水费</text>
           <text class="switch-desc">开启将从此笔分值中扣除 {{roomInfo.tea_money_per_tx}} 分计入茶水</text>
@@ -234,7 +222,9 @@
           <van-button custom-class="btn-outline" block bindtap="onCloseScorePopup">取消</van-button>
         </view>
         <view style="width: 48%;">
-          <van-button custom-class="btn-blue" block disabled="{{!selectedPayerId || !inputScore}}" bindtap="submitScore">确认计分</van-button>
+          <van-button custom-class="btn-green" block disabled="{{!selectedPayerId || !inputScore}}" bindtap="submitScore">
+            {{isPureTea ? '确认缴纳' : '确认计分'}}
+          </van-button>
         </view>
       </view>
     </view>
@@ -279,7 +269,7 @@
         <text>🍵 本局共收取茶水费: {{roomInfo.accumulated_tea_money}} 分</text>
       </view>
 
-      <van-button custom-class="btn-green" style="width: 90%; margin-top: 40rpx;" bindtap="exitRoomToHome">返回游戏大厅</van-button>
+      <van-button custom-class="btn-green" custom-style="width: 100%; height: 92rpx; line-height: 92rpx; white-space: nowrap; font-size: 30rpx; margin-top: 45rpx;" block bindtap="exitRoomToHome">返回游戏大厅</van-button>
     </view>
   </van-popup>
 </view>

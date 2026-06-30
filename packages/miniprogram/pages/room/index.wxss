@@ -57,7 +57,11 @@
 
 .tea-progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, var(--theme-color-blue) 0%, var(--theme-color-green) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--theme-color-blue) 0%,
+    var(--theme-color-green) 100%
+  );
   border-radius: 6rpx;
   transition: width 0.5s ease-out;
 }
@@ -66,7 +70,11 @@
   position: absolute;
   top: 0;
   height: 100%;
-  background: linear-gradient(90deg, var(--theme-color-blue) 0%, var(--theme-color-green) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--theme-color-blue) 0%,
+    var(--theme-color-green) 100%
+  );
   filter: blur(4px);
   opacity: 0.6;
   border-radius: 6rpx;
@@ -138,69 +146,44 @@
   color: var(--text-secondary);
 }
 
-/* 少于等于4人使用的大卡片网格布局 */
-.players-grid {
+/* 统一的网格大卡片容器 */
+.players-grid-container {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24rpx;
+  gap: 20rpx;
 }
 
-.players-grid .player-card {
-  margin: 0;
-  padding: 30rpx 20rpx;
+/* 1/2/4人 一排2个 */
+.grid-cols-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* 3人及大于4人 一排3个 */
+.grid-cols-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* 统一玩家卡片样式 */
+.player-card {
+  margin: 0 !important;
+  padding: 24rpx 12rpx !important; /* 压缩内边距以保障在一行3个时文字不挤压折行 */
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
 }
 
-.players-grid .player-avatar-box {
-  width: 110rpx;
-  height: 110rpx;
-  border-radius: 50%;
-  margin-bottom: 16rpx;
-}
-
-.players-grid .player-score {
-  font-size: 38rpx;
-  margin-top: 10rpx;
-}
-
-/* 大于4人时使用的扁平列表布局 */
-.players-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-}
-
-.players-list .player-card {
-  margin: 0;
-  padding: 24rpx 30rpx;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-}
-
-.players-list .player-avatar-box {
-  width: 70rpx;
-  height: 70rpx;
-  border-radius: 50%;
-  margin-right: 24rpx;
-}
-
-.players-list .player-info-box {
-  flex: 1;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.players-list .player-score {
-  font-size: 34rpx;
+/* 头像外层独立的 container，用来在头像外面正上方绝对定位【我】字 */
+.player-avatar-container {
+  position: relative;
+  margin-bottom: 12rpx;
+  margin-top: 12rpx;
 }
 
 /* 通用头像及文字代用头像 */
 .player-avatar-box {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
   overflow: hidden;
   background-color: rgba(0, 0, 0, 0.02);
   border: 2px solid rgba(0, 150, 199, 0.25);
@@ -222,15 +205,25 @@
   font-weight: bold;
 }
 
+.player-info-box {
+  width: 100%;
+  align-items: center;
+}
+
 .player-nickname {
   font-size: 28rpx;
   color: #1e2a27;
   font-weight: bold;
-  max-width: 180rpx;
+  max-width: 100%;
+  line-height: 36rpx; /* 精细设定行高，消除文字默认多余的上下空距 */
+  margin-bottom: 6rpx; /* 代替多余的空行，提供优雅的 6rpx 紧凑间隙 */
 }
 
 .player-score {
   font-weight: bold;
+  font-size: 34rpx;
+  line-height: 40rpx; /* 精细设定行高，消除多余空距 */
+  margin-top: 8rpx;
 }
 
 .score-positive {
@@ -560,4 +553,21 @@
   padding: 16rpx 30rpx;
   font-size: 24rpx;
   color: var(--text-secondary);
+}
+
+/* 头像上方浮动的小黄标 “我” */
+.me-badge {
+  position: absolute;
+  top: -12rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #ffd700;
+  color: #5c4308;
+  font-size: 16rpx;
+  font-weight: bold;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  z-index: 10;
+  box-shadow: 0 2rpx 6rpx rgba(255, 215, 0, 0.3);
+  white-space: nowrap;
 }
