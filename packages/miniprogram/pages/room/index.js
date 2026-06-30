@@ -193,16 +193,38 @@ Page({
   },
 
   onTotalTeaChange: function (e) {
-    this.setData({ inputTotalTea: e.detail });
+    // 强制正则过滤掉所有非数字字符（包含负号、小数点、字母等），防范源头输入错误
+    const val = String(e.detail).replace(/[^\d]/g, '');
+    this.setData({ inputTotalTea: val });
   },
 
   onPerTxTeaChange: function (e) {
-    this.setData({ inputPerTxTea: e.detail });
+    // 强制正则过滤掉所有非数字字符（包含负号、小数点、字母等），防范源头输入错误
+    const val = String(e.detail).replace(/[^\d]/g, '');
+    this.setData({ inputPerTxTea: val });
   },
 
   submitTeaConfig: function () {
-    const total = parseInt(this.data.inputTotalTea) || 0;
-    const per = parseInt(this.data.inputPerTxTea) || 0;
+    const totalStr = String(this.data.inputTotalTea).trim();
+    const perStr = String(this.data.inputPerTxTea).trim();
+
+    // 校验输入非空时必须是大于0的正整数
+    if (totalStr !== '' && (!/^\d+$/.test(totalStr) || parseInt(totalStr) <= 0)) {
+      wx.showToast({ title: '总茶水钱必须是正数', icon: 'none' });
+      return;
+    }
+    if (perStr !== '' && (!/^\d+$/.test(perStr) || parseInt(perStr) <= 0)) {
+      wx.showToast({ title: '每笔扣除必须是正数', icon: 'none' });
+      return;
+    }
+
+    const total = totalStr === '' ? 0 : parseInt(totalStr);
+    const per = perStr === '' ? 0 : parseInt(perStr);
+
+    if (per > total && total > 0) {
+      wx.showToast({ title: '每笔扣除不能大于总茶水钱', icon: 'none' });
+      return;
+    }
 
     app.request({
       url: '/api/room/set-tea',

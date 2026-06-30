@@ -111,8 +111,12 @@
       />
 
       <view class="popup-actions flex-row justify-between" style="width: 100%; margin-top: 40rpx; padding: 0 40rpx;">
-        <van-button custom-class="btn-outline" style="width: 45%;" bindtap="onCloseJoinPopup">取消</van-button>
-        <van-button custom-class="btn-blue" style="width: 45%;" disabled="{{ roomCodeInput.length < 6 }}" bindtap="submitJoinRoom">确认加入</van-button>
+        <view style="width: 48%;">
+          <van-button custom-class="btn-outline" block bindtap="onCloseJoinPopup">取消</van-button>
+        </view>
+        <view style="width: 48%;">
+          <van-button custom-class="btn-green" block disabled="{{ roomCodeInput.length < 6 }}" bindtap="submitJoinRoom">确认加入</van-button>
+        </view>
       </view>
     </view>
   </van-popup>

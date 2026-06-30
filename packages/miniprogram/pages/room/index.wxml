@@ -139,7 +139,7 @@
         <text class="copy-tip">📋 点击复制房间号</text>
       </view>
       
-      <van-button custom-class="btn-green" style="width: 80%; margin-top: 30rpx;" bindtap="onCloseQRCode">知道了</van-button>
+      <van-button custom-class="btn-green" custom-style="width: 280rpx; margin-top: 40rpx;" block bindtap="onCloseQRCode">关闭弹窗</van-button>
     </view>
   </van-popup>
 
@@ -171,9 +171,13 @@
         input-align="right"
       />
       
-      <view class="popup-actions flex-row justify-between" style="margin-top: 40rpx;">
-        <van-button custom-class="btn-outline" style="width: 45%;" bindtap="onCloseTeaPopup">取消</van-button>
-        <van-button custom-class="btn-green" style="width: 45%;" bindtap="submitTeaConfig">确认设置</van-button>
+      <view class="popup-actions flex-row justify-between" style="margin-top: 40rpx; width: 100%;">
+        <view style="width: 48%;">
+          <van-button custom-class="btn-outline" block bindtap="onCloseTeaPopup">取消</van-button>
+        </view>
+        <view style="width: 48%;">
+          <van-button custom-class="btn-green" block bindtap="submitTeaConfig">确认设置</van-button>
+        </view>
       </view>
     </view>
   </van-popup>
@@ -225,9 +229,13 @@
         <van-switch checked="{{ deductTeaChecked }}" active-color="#06d6a0" bind:change="onTeaSwitchChange" />
       </view>
 
-      <view class="popup-actions flex-row justify-between" style="margin-top: 40rpx;">
-        <van-button custom-class="btn-outline" style="width: 45%;" bindtap="onCloseScorePopup">取消</van-button>
-        <van-button custom-class="btn-blue" style="width: 45%;" disabled="{{!selectedPayerId || !inputScore}}" bindtap="submitScore">确认计分</van-button>
+      <view class="popup-actions flex-row justify-between" style="margin-top: 40rpx; width: 100%;">
+        <view style="width: 48%;">
+          <van-button custom-class="btn-outline" block bindtap="onCloseScorePopup">取消</van-button>
+        </view>
+        <view style="width: 48%;">
+          <van-button custom-class="btn-blue" block disabled="{{!selectedPayerId || !inputScore}}" bindtap="submitScore">确认计分</van-button>
+        </view>
       </view>
     </view>
   </van-popup>
@@ -236,7 +244,7 @@
   <van-popup
     show="{{ showSettleReport }}"
     round
-    custom-style="width: 85%; padding: 40rpx; border-radius: 40rpx; background: radial-gradient(circle at 50% 30%, #0d2822 0%, #050d0a 100%);"
+    custom-style="width: 85%; padding: 40rpx; border-radius: 40rpx; background: radial-gradient(circle at 50% 30%, #f7f9f8 0%, #edf2f0 100%);"
   >
     <view class="settle-popup-content flex-column flex-center">
       <view class="crown-box flex-center">👑</view>
