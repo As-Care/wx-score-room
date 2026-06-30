@@ -1,17 +1,17 @@
 /** 全局样式表 - 微信计分房 **/
 
 page {
-  background-color: #050d0a;
-  color: #e0f2f1;
+  background-color: #edf2f0;
+  color: #1e2a27;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   box-sizing: border-box;
-  --theme-color-blue: #00b4d8;
-  --theme-color-green: #06d6a0;
-  --bg-dark-depth: #050d0a;
-  --bg-dark-card: rgba(16, 32, 28, 0.85);
-  --border-glow: rgba(6, 214, 160, 0.15);
-  --text-primary: #e0f2f1;
-  --text-secondary: #809a96;
+  --theme-color-blue: #0096c7;
+  --theme-color-green: #0b9b77;
+  --bg-dark-depth: #edf2f0;
+  --bg-dark-card: rgba(255, 255, 255, 0.95);
+  --border-glow: rgba(11, 155, 119, 0.1);
+  --text-primary: #1e2a27;
+  --text-secondary: #596c68;
 }
 
 /* 微信默认基础样式重置 */
@@ -19,26 +19,26 @@ view, text, scroll-view, input, button {
   box-sizing: border-box;
 }
 
-/* 霓虹蓝绿微光背景容器 */
+/* 霓虹蓝绿护眼亮色背景容器 */
 .page-container {
   min-height: 100vh;
-  background: radial-gradient(circle at 10% 20%, rgba(0, 180, 216, 0.1) 0%, transparent 40%),
-              radial-gradient(circle at 90% 80%, rgba(6, 214, 160, 0.1) 0%, transparent 40%),
-              #050d0a;
+  background: radial-gradient(circle at 10% 20%, rgba(0, 150, 199, 0.06) 0%, transparent 40%),
+              radial-gradient(circle at 90% 80%, rgba(11, 155, 119, 0.06) 0%, transparent 40%),
+              #edf2f0;
   padding-bottom: 60rpx;
   position: relative;
   overflow-x: hidden;
 }
 
-/* 高级毛玻璃卡片效果 */
+/* 高级亮色磨砂卡片效果 */
 .glass-card {
   background: var(--bg-dark-card);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 24rpx;
-  box-shadow: 0 16rpx 48rpx rgba(0, 0, 0, 0.4),
-              0 0 16rpx var(--border-glow);
+  box-shadow: 0 10rpx 36rpx rgba(11, 40, 34, 0.08),
+              0 0 10rpx var(--border-glow);
   padding: 40rpx;
   margin: 30rpx;
   transition: all 0.3s ease;
@@ -46,32 +46,32 @@ view, text, scroll-view, input, button {
 
 /* 呼吸光边框 */
 .glow-border {
-  border: 1px solid rgba(6, 214, 160, 0.3);
-  box-shadow: 0 0 20rpx rgba(6, 214, 160, 0.2);
+  border: 1px solid rgba(11, 155, 119, 0.25);
+  box-shadow: 0 0 20rpx rgba(11, 155, 119, 0.15);
 }
 
-/* 自定义高档导航栏 */
+/* 自定义高档导航栏 (亮色磨砂) */
 .custom-navbar {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 999;
-  background: rgba(5, 13, 10, 0.85);
+  background: rgba(237, 242, 240, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
   padding-left: 32rpx;
 }
 
 .navbar-title {
-  color: #ffffff;
+  color: #1e2a27;
   font-size: 34rpx;
   font-weight: 600;
   letter-spacing: 2rpx;
-  text-shadow: 0 0 10rpx rgba(0, 180, 216, 0.5);
+  text-shadow: 0 0 8rpx rgba(0, 150, 199, 0.15);
 }
 
 .navbar-back {
@@ -81,26 +81,26 @@ view, text, scroll-view, input, button {
   width: 60rpx;
   height: 60rpx;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.05);
   margin-right: 20rpx;
 }
 
 /* 按钮渐变色 - 高端蓝 */
 .btn-blue {
-  background: linear-gradient(135deg, #0077b6 0%, #00b4d8 100%) !important;
+  background: linear-gradient(135deg, #0077b6 0%, #0096c7 100%) !important;
   color: #ffffff !important;
   border: none !important;
-  box-shadow: 0 8rpx 24rpx rgba(0, 180, 216, 0.3) !important;
+  box-shadow: 0 8rpx 20rpx rgba(0, 150, 199, 0.15) !important;
   border-radius: 20rpx !important;
   font-weight: bold !important;
 }
 
 /* 按钮渐变色 - 高端绿 */
 .btn-green {
-  background: linear-gradient(135deg, #0f9b0f 0%, #06d6a0 100%) !important;
+  background: linear-gradient(135deg, #0b9b77 0%, #06d6a0 100%) !important;
   color: #ffffff !important;
   border: none !important;
-  box-shadow: 0 8rpx 24rpx rgba(6, 214, 160, 0.3) !important;
+  box-shadow: 0 8rpx 20rpx rgba(11, 155, 119, 0.15) !important;
   border-radius: 20rpx !important;
   font-weight: bold !important;
 }
@@ -108,8 +108,8 @@ view, text, scroll-view, input, button {
 /* 扁平幽灵按钮 */
 .btn-outline {
   background: transparent !important;
-  color: #e0f2f1 !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: #1e2a27 !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
   border-radius: 20rpx !important;
 }
 
@@ -156,38 +156,45 @@ view, text, scroll-view, input, button {
   white-space: nowrap;
 }
 
-/* 覆写 Vant 默认弹窗和输入框样式以配搭暗黑高端主调 */
+/* 覆写 Vant 默认弹窗和输入框样式以配搭亮色高端主调 */
 .van-popup {
-  background-color: #0b1a16 !important;
-  color: #e0f2f1 !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background-color: #ffffff !important;
+  color: #1e2a27 !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
 }
 
 .van-dialog {
-  background-color: #0b1a16 !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background-color: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
 }
 
 .van-dialog__title {
-  color: #ffffff !important;
+  color: #1e2a27 !important;
 }
 
 .van-dialog__message {
-  color: #809a96 !important;
+  color: #596c68 !important;
 }
 
 .van-cell {
-  background-color: rgba(255, 255, 255, 0.03) !important;
-  color: #e0f2f1 !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  background-color: rgba(0, 0, 0, 0.02) !important;
+  color: #1e2a27 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04) !important;
   border-radius: 12rpx !important;
   margin-bottom: 20rpx !important;
 }
 
+/* 去除输入框的底边下划线 */
+.van-cell::after {
+  border-bottom: none !important;
+}
+
+/* 确保输入的文字更深（深黑），比提示语亮，易于区分 */
 .van-field__input {
-  color: #ffffff !important;
+  color: #000000 !important;
+  font-weight: 600 !important;
 }
 
 .van-cell__title {
-  color: #809a96 !important;
+  color: #596c68 !important;
 }

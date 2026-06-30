@@ -6,3 +6,7 @@ compatibility_date = "2023-05-18"
 binding = "DB"
 database_name = "wx_score_room_db"
 database_id = "2858e78d-5e9a-40bd-8593-68ee660e7187"
+
+[[r2_buckets]]
+binding = "AVATARS"
+bucket_name = "wx_score_room_bucket"

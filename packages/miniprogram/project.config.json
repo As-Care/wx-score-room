@@ -2,20 +2,29 @@
   "miniprogramRoot": "./",
   "projectname": "wx-score-room",
   "description": "微信计分小程序",
-  "appid": "touristappid",
+  "appid": "wx4681bcb28c372453",
   "setting": {
     "urlCheck": false,
     "es6": true,
     "postcss": true,
     "minified": true,
-    "packNpmManually": true,
-    "packNpmRelationList": [
-      {
-        "packageJsonPath": "./package.json",
-        "miniprogramNpmDistDir": "./"
-      }
-    ]
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false,
+    "swc": false,
+    "disableSWC": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
   },
   "compileType": "miniprogram",
-  "libVersion": "3.0.0"
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "libVersion": "3.4.0",
+  "editorSetting": {}
 }

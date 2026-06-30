@@ -11,15 +11,15 @@
     "backgroundColor": "#0b1e1a"
   },
   "usingComponents": {
-    "van-button": "@vant/weapp/button/index",
-    "van-icon": "@vant/weapp/icon/index",
-    "van-popup": "@vant/weapp/popup/index",
-    "van-dialog": "@vant/weapp/dialog/index",
-    "van-field": "@vant/weapp/field/index",
-    "van-switch": "@vant/weapp/switch/index",
-    "van-toast": "@vant/weapp/toast/index",
-    "van-notify": "@vant/weapp/notify/index",
-    "van-overlay": "@vant/weapp/overlay/index"
+    "van-button": "/miniprogram_npm/@vant/weapp/button/index",
+    "van-icon": "/miniprogram_npm/@vant/weapp/icon/index",
+    "van-popup": "/miniprogram_npm/@vant/weapp/popup/index",
+    "van-dialog": "/miniprogram_npm/@vant/weapp/dialog/index",
+    "van-field": "/miniprogram_npm/@vant/weapp/field/index",
+    "van-switch": "/miniprogram_npm/@vant/weapp/switch/index",
+    "van-toast": "/miniprogram_npm/@vant/weapp/toast/index",
+    "van-notify": "/miniprogram_npm/@vant/weapp/notify/index",
+    "van-overlay": "/miniprogram_npm/@vant/weapp/overlay/index"
   },
   "sitemapLocation": "sitemap.json"
 }

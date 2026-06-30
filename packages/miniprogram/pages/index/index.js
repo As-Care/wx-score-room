@@ -92,8 +92,36 @@ Page({
   // 微信快捷选择头像回调 (最新规范)
   onChooseAvatar: function (e) {
     const { avatarUrl } = e.detail;
-    this.setData({ avatarUrl });
-    this.updateUserProfile(this.data.nickname, avatarUrl);
+    
+    // 调用微信底层的上传接口将本地临时头像上传至 Cloudflare R2 存储库中
+    wx.showLoading({ title: '上传头像中...', mask: true });
+    wx.uploadFile({
+      url: `${app.globalData.apiUrl}/api/upload`,
+      filePath: avatarUrl,
+      name: 'file',
+      header: {
+        'Authorization': `Bearer ${app.globalData.token}`
+      },
+      success: (res) => {
+        wx.hideLoading();
+        try {
+          const apiRes = JSON.parse(res.data);
+          if (apiRes.code === 0 && apiRes.data?.avatarUrl) {
+            const onlineUrl = apiRes.data.avatarUrl;
+            this.setData({ avatarUrl: onlineUrl });
+            this.updateUserProfile(this.data.nickname, onlineUrl);
+          } else {
+            wx.showToast({ title: apiRes.message || '头像保存失败', icon: 'none' });
+          }
+        } catch (err) {
+          wx.showToast({ title: '解析上传数据失败', icon: 'none' });
+        }
+      },
+      fail: (err) => {
+        wx.hideLoading();
+        wx.showToast({ title: '网络上传失败，请检查网络', icon: 'none' });
+      }
+    });
   },
 
   // 微信快捷填入昵称失去焦点回调 (最新规范)

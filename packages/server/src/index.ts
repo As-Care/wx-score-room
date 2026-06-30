@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 
 type Bindings = {
   DB: D1Database;
+  AVATARS: R2Bucket; // 关联的 Cloudflare R2 存储库
   WX_APPID?: string;
   WX_SECRET?: string;
 };
@@ -47,10 +48,10 @@ async function authenticate(request: Request, db: D1Database) {
     .bind(token)
     .first<any>();
 
-  // 2. 如果不存在，自动进行静默降级注册，保障前端不卡死
+  // 2. 如果不存在，自动进行静默降级注册
   if (!user) {
-    const shortId = token.length > 4 ? token.slice(-4) : '玩家';
-    const defaultName = `玩家_${shortId}`;
+    const randomNum = Math.floor(1000 + Math.random() * 9000).toString(); // 模拟昵称：玩家_xxxx (xxxx为随机数字)
+    const defaultName = `玩家_${randomNum}`;
     await db
       .prepare('INSERT INTO users (openid, nickname) VALUES (?, ?)')
       .bind(token, defaultName)
@@ -74,7 +75,7 @@ async function fetchOpenId(code: string, bindings: Bindings): Promise<string> {
     return `mock_openid_${code}`;
   }
 
-  const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${appid}&secret=${secret}&js_code=${code}&grant_type=authorization_code`;
+  const url = `https://api.weixin.qq.com/sns/jscode2session?appid={appid}&secret={secret}&js_code={code}&grant_type=authorization_code`;
   try {
     const response = await fetch(url);
     const body = (await response.json()) as any;
@@ -139,7 +140,59 @@ app.post('/api/user/update', async (c) => {
   }
 });
 
-// 3. 创建房间并自动加入
+// 3. 上传头像图片至 Cloudflare R2 存储库
+app.post('/api/upload', async (c) => {
+  try {
+    const user = await authenticate(c.req.raw, c.env.DB);
+    const body = await c.req.parseBody();
+    const file = body['file'];
+
+    if (!file || !(file instanceof File)) {
+      return jsonErr(400, '未检测到上传文件');
+    }
+
+    // 生成在 R2 中的唯一 key (openid_时间戳.jpg)
+    const fileExt = file.name ? file.name.split('.').pop() : 'jpg';
+    const key = `avatars/${user.openid}_${Date.now()}.${fileExt}`;
+
+    // 将头像数据写入 R2 桶
+    await c.env.AVATARS.put(key, file.stream(), {
+      httpMetadata: { contentType: file.type || 'image/jpeg' }
+    });
+
+    // 动态生成本 Worker 作为中间代理的访问路径，免去配置 R2 公网域名
+    const requestUrl = new URL(c.req.url);
+    const avatarUrl = `${requestUrl.origin}/api/avatar/${key}`;
+
+    return jsonOk({ avatarUrl });
+  } catch (err: any) {
+    return jsonErr(500, err.message || '文件上传失败');
+  }
+});
+
+// 4. 代理访问 R2 存储的头像资源
+app.get('/api/avatar/avatars/:filename', async (c) => {
+  try {
+    const filename = c.req.param('filename');
+    const key = `avatars/${filename}`;
+    const object = await c.env.AVATARS.get(key);
+
+    if (!object) {
+      return c.text('Avatar Not Found', 404);
+    }
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('etag', object.httpEtag);
+    headers.set('Cache-Control', 'public, max-age=86400'); // 开启缓存 1 天
+
+    return new Response(object.body, { headers });
+  } catch (err) {
+    return c.text('Internal Server Error', 500);
+  }
+});
+
+// 5. 创建房间并自动加入
 app.post('/api/room/create', async (c) => {
   try {
     const user = await authenticate(c.req.raw, c.env.DB);
@@ -193,7 +246,7 @@ app.post('/api/room/create', async (c) => {
   }
 });
 
-// 4. 加入房间
+// 6. 加入房间
 app.post('/api/room/join', async (c) => {
   try {
     const user = await authenticate(c.req.raw, c.env.DB);
@@ -244,7 +297,7 @@ app.post('/api/room/join', async (c) => {
   }
 });
 
-// 5. 设置/修改茶水钱
+// 7. 设置/修改茶水钱
 app.post('/api/room/set-tea', async (c) => {
   try {
     await authenticate(c.req.raw, c.env.DB);
@@ -262,7 +315,7 @@ app.post('/api/room/set-tea', async (c) => {
   }
 });
 
-// 6. 记分 (零和交易事务及茶水自动扣除)
+// 8. 记分 (零和交易事务及茶水自动扣除)
 app.post('/api/room/score', async (c) => {
   try {
     await authenticate(c.req.raw, c.env.DB);
@@ -331,7 +384,7 @@ app.post('/api/room/score', async (c) => {
   }
 });
 
-// 7. 撤销记分 (积分、茶水一键回滚)
+// 9. 撤销记分 (积分、茶水一键回滚)
 app.post('/api/room/undo', async (c) => {
   try {
     await authenticate(c.req.raw, c.env.DB);
@@ -398,7 +451,7 @@ app.post('/api/room/undo', async (c) => {
   }
 });
 
-// 8. 智能对账轮询 (1秒1次低消耗设计)
+// 10. 智能对账轮询 (1秒1次低消耗设计)
 app.get('/api/room/poll', async (c) => {
   try {
     await authenticate(c.req.raw, c.env.DB);
@@ -464,7 +517,7 @@ app.get('/api/room/poll', async (c) => {
   }
 });
 
-// 9. 房主结算对局
+// 11. 房主结算对局
 app.post('/api/room/settle', async (c) => {
   try {
     const user = await authenticate(c.req.raw, c.env.DB);
@@ -495,12 +548,12 @@ app.post('/api/room/settle', async (c) => {
   }
 });
 
-// 10. 个人中心战绩历史查询
+// 12. 个人中心战绩历史查询 (过滤没有得分/茶水的“空对局”房间)
 app.get('/api/user/history', async (c) => {
   try {
     const user = await authenticate(c.req.raw, c.env.DB);
 
-    // 查询参与的房间历史记录
+    // 查询参与的房间历史记录 (过滤没有有效未撤销记分流水的空对局房间)
     const history = await c.env.DB
       .prepare(
         'SELECT r.id as room_id, r.room_code, u.nickname as owner_nickname, \
@@ -509,6 +562,7 @@ app.get('/api/user/history', async (c) => {
          JOIN rooms r ON ru.room_id = r.id \
          JOIN users u ON r.owner_id = u.id \
          WHERE ru.user_id = ? \
+           AND EXISTS (SELECT 1 FROM transactions t WHERE t.room_id = r.id AND t.is_undone = 0) \
          ORDER BY r.id DESC'
       )
       .bind(user.id)
@@ -548,8 +602,8 @@ async function dbGetOrCreateUser(db: D1Database, openid: string) {
     .first<any>();
 
   if (!user) {
-    const shortId = openid.length > 4 ? openid.slice(-4) : '玩家';
-    const defaultName = `玩家_${shortId}`;
+    const randomNum = Math.floor(1000 + Math.random() * 9000).toString(); // 模拟昵称：玩家_xxxx (xxxx为随机数字)
+    const defaultName = `玩家_${randomNum}`;
     await db
       .prepare('INSERT INTO users (openid, nickname) VALUES (?, ?)')
       .bind(openid, defaultName)
