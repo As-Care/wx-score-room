@@ -2,6 +2,10 @@ name = "wx-score-room"
 main = "src/index.ts"
 compatibility_date = "2023-05-18"
 
+[vars]
+WX_APPID = "wx4681bcb28c372453"
+
+
 [[d1_databases]]
 binding = "DB"
 database_name = "wx_score_room_db"
