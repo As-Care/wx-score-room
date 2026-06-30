@@ -76,12 +76,14 @@ async function fetchOpenId(code: string, bindings: Bindings): Promise<string> {
     return `mock_openid_${code}`;
   }
 
-  const url = `https://api.weixin.qq.com/sns/jscode2session?appid={appid}&secret={secret}&js_code={code}&grant_type=authorization_code`;
+  const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${appid}&secret=${secret}&js_code=${code}&grant_type=authorization_code`;
   try {
     const response = await fetch(url);
     const body = (await response.json()) as any;
     if (body.openid) {
       return body.openid;
+    } else {
+      console.error('微信验证接口返回错误:', body);
     }
   } catch (e) {
     console.error('微信 Code 校验请求失败', e);
