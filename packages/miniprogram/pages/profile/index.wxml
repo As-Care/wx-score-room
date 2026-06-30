@@ -19,7 +19,7 @@
         </view>
         <view class="user-info flex-column flex-1">
           <text class="user-nickname">{{userInfo.nickname || '未登录'}}</text>
-          <text class="user-register-time">打牌计分房专属游戏玩家</text>
+          <text class="user-register-time">打牌记账亲友房专属游戏玩家</text>
         </view>
         <view class="user-total-score flex-column align-end">
           <text class="total-score-label">历史总积分</text>
@@ -66,14 +66,27 @@
       
       <!-- 1. 历史对局列表 -->
       <view class="history-list-view" wx:if="{{activeTab === 0}}">
-        <view class="glass-card history-card" wx:for="{{historyRooms}}" wx:key="room_id">
-          <view class="justify-between align-center">
-            <view class="flex-column">
+        <view class="glass-card history-card" wx:for="{{historyRooms}}" wx:key="room_id" bindtap="goToRoom" data-room-id="{{item.room_id}}" data-room-code="{{item.room_code}}">
+          <!-- 第一排：房间号 与 最终得分标签 -->
+          <view class="card-row-top justify-between align-center">
+            <view class="flex-row align-center">
               <text class="room-code-tag">房间: {{item.room_code}}</text>
-              <text class="room-meta">房主: {{item.owner_nickname}}</text>
+              <view class="room-status-badge {{item.room_status === 1 ? 'status-finished' : 'status-ongoing'}}">
+                {{item.room_status === 1 ? '已结束' : '进行中'}}
+              </view>
             </view>
-            <view class="flex-column align-end">
-              <text class="final-score-title">最终得分</text>
+            <text class="final-score-title">最终得分</text>
+          </view>
+          
+          <!-- 第二排：(房主/玩家) 与 (最终分值) -->
+          <view class="card-row-bottom justify-between align-center" style="margin-top: 16rpx;">
+            <!-- 左侧：房主、玩家列 -->
+            <view class="flex-column" style="flex: 1; min-width: 0; padding-right: 30rpx;">
+              <text class="room-meta">房主: {{item.owner_nickname}}</text>
+              <text class="room-players-list ellipsis">玩家: {{item.player_names || ''}}</text>
+            </view>
+            <!-- 右侧：分值大数字 (垂直居中对齐左侧两行文字) -->
+            <view class="score-container">
               <text class="final-score-num {{item.final_score > 0 ? 'score-positive' : (item.final_score < 0 ? 'score-negative' : 'score-zero')}}">
                 {{item.final_score > 0 ? '+' + item.final_score : item.final_score}}
               </text>

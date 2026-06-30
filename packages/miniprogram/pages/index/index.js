@@ -135,7 +135,6 @@ Page({
           if (apiRes.code === 0 && apiRes.data?.avatarUrl) {
             const onlineUrl = apiRes.data.avatarUrl;
             this.setData({ avatarUrl: onlineUrl });
-            this.updateUserProfile(this.data.nickname, onlineUrl);
           } else {
             wx.showToast({ title: apiRes.message || '头像保存失败', icon: 'none' });
           }
@@ -154,31 +153,11 @@ Page({
   onNicknameBlur: function (e) {
     const nickname = e.detail.value;
     this.setData({ nickname });
-    this.updateUserProfile(nickname, this.data.avatarUrl);
   },
 
   onNicknameInput: function (e) {
     this.setData({
       nickname: e.detail.value
-    });
-  },
-
-  // 提交个人信息更新到后端
-  updateUserProfile: function (nickname, avatarUrl) {
-    if (!nickname) return;
-    
-    app.request({
-      url: '/api/user/update',
-      method: 'POST',
-      data: {
-        nickname: nickname,
-        avatar_url: avatarUrl
-      }
-    }).then(updatedUser => {
-      app.globalData.userInfo = updatedUser;
-      wx.setStorageSync('userInfo', updatedUser);
-    }).catch(err => {
-      console.error('更新用户信息失败', err);
     });
   },
 

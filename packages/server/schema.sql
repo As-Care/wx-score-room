@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS rooms (
     owner_id INTEGER NOT NULL,         -- 房主 (关联 users.id)
     total_tea_money INTEGER DEFAULT 0, -- 总茶水钱上限金额
     tea_money_per_tx INTEGER DEFAULT 0,-- 每笔交易扣除的茶水钱
+    tea_mode INTEGER DEFAULT 0,        -- 茶水扣除方式 (0: 固定金额, 1: 百分比)
     accumulated_tea_money INTEGER DEFAULT 0, -- 当前已收取的茶水钱总数
     version INTEGER DEFAULT 1,         -- 房间版本号 (每次分数变动/设置茶水/撤销，此值自增 1)
     status INTEGER DEFAULT 0,          -- 房间状态 (0: 进行中, 1: 已结算/结束)

@@ -22,6 +22,7 @@ Page({
     // 茶水参数设置输入
     inputTotalTea: '',
     inputPerTxTea: '',
+    inputTeaMode: 0, // 0: 固定金额, 1: 百分比
     teaProgress: 0,
 
     // 记分参数
@@ -36,6 +37,8 @@ Page({
     mvpPlayer: null,
     myUserId: 0,
     isRefreshing: false,
+    activeBillTab: 'total',
+    personalTransactions: [],
 
     // 个人信息编辑数据
     avatarUrl: '',
@@ -77,7 +80,7 @@ Page({
   // 微信转发/分享房间设置 (分享到聊天窗口)
   onShareAppMessage: function () {
     return {
-      title: `🎮 邀请你加入我的计分房: ${this.data.roomCode}，来联机对局吧！`,
+      title: `🎮 邀请你加入我的记账房: ${this.data.roomCode}，来联机对局吧！`,
       path: `/pages/index/index?room_code=${this.data.roomCode}`,
       imageUrl: '/images/share-card.png' // 如果没有该图片，微信会自动截屏当前页面
     };
@@ -123,15 +126,19 @@ Page({
             progress = Math.min(100, Math.floor((room.accumulated_tea_money / room.total_tea_money) * 100));
           }
 
+          const myId = app.globalData.userInfo ? app.globalData.userInfo.id : 0;
+          const personalTxs = (data.transactions || []).filter(t => t.from_user_id === myId || t.to_user_id === myId);
+
           this.setData({
             roomInfo: room,
             players: data.players || [],
             transactions: data.transactions || [],
+            personalTransactions: personalTxs,
             localVersion: room.version,
             teaProgress: progress,
             inputTotalTea: room.total_tea_money || '',
             inputPerTxTea: room.tea_money_per_tx || '',
-            myUserId: app.globalData.userInfo ? app.globalData.userInfo.id : 0
+            myUserId: myId
           });
 
           // 检查结算状态
@@ -206,15 +213,19 @@ Page({
           progress = Math.min(100, Math.floor((room.accumulated_tea_money / room.total_tea_money) * 100));
         }
 
+        const myId = app.globalData.userInfo ? app.globalData.userInfo.id : 0;
+        const personalTxs = transactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
+
         this.setData({
           roomInfo: room,
           players: players,
           transactions: transactions,
+          personalTransactions: personalTxs,
           localVersion: room.version,
           teaProgress: progress,
           inputTotalTea: room.total_tea_money || '',
           inputPerTxTea: room.tea_money_per_tx || '',
-          myUserId: app.globalData.userInfo ? app.globalData.userInfo.id : 0
+          myUserId: myId
         });
 
         // 核心检查：如果房间已结算，自动停止轮询并弹出结算大赢家海报
@@ -262,15 +273,19 @@ Page({
         progress = Math.min(100, Math.floor((room.accumulated_tea_money / room.total_tea_money) * 100));
       }
       
+      const myId = app.globalData.userInfo ? app.globalData.userInfo.id : 0;
+      const personalTxs = transactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
+      
       this.setData({
         roomInfo: room,
         players: players,
         transactions: transactions,
+        personalTransactions: personalTxs,
         localVersion: room.version,
         teaProgress: progress,
         inputTotalTea: room.total_tea_money || '',
         inputPerTxTea: room.tea_money_per_tx || '',
-        myUserId: app.globalData.userInfo ? app.globalData.userInfo.id : 0
+        myUserId: myId
       });
       
       wx.showToast({ title: '分数已同步', icon: 'success', duration: 800 });
@@ -284,6 +299,12 @@ Page({
       this.setData({ isRefreshing: false });
       console.error('手动刷新分数失败', err);
     });
+  },
+
+  // 切换账单显示 Tab (总账单 / 个人账单)
+  switchBillTab: function (e) {
+    const tab = e.currentTarget.dataset.tab;
+    this.setData({ activeBillTab: tab });
   },
 
   // 退出房间回到首页大厅
@@ -352,7 +373,8 @@ Page({
     this.setData({
       showTeaModal: true,
       inputTotalTea: this.data.roomInfo.total_tea_money || '',
-      inputPerTxTea: this.data.roomInfo.tea_money_per_tx || ''
+      inputPerTxTea: this.data.roomInfo.tea_money_per_tx || '',
+      inputTeaMode: this.data.roomInfo.tea_mode || 0
     });
   },
 
@@ -366,31 +388,58 @@ Page({
     this.setData({ inputTotalTea: val });
   },
 
+  changeTeaMode: function (e) {
+    const mode = parseInt(e.currentTarget.dataset.mode);
+    this.setData({
+      inputTeaMode: mode,
+      inputPerTxTea: '' // 切换模式时清空已输入的每笔数值，防止格式错乱
+    });
+  },
+
   onPerTxTeaChange: function (e) {
-    // 强制正则过滤掉所有非数字字符（包含负号、小数点、字母等），防范源头输入错误
-    const val = String(e.detail).replace(/[^\d]/g, '');
-    this.setData({ inputPerTxTea: val });
+    const rawVal = String(e.detail);
+    if (this.data.inputTeaMode === 1) {
+      // 百分比模式：允许输入最多两位小数的浮点数
+      let val = rawVal.replace(/[^\d.]/g, '');
+      const parts = val.split('.');
+      if (parts.length > 2) {
+        val = parts[0] + '.' + parts.slice(1).join('');
+      }
+      if (parts[1] && parts[1].length > 2) {
+        val = parts[0] + '.' + parts[1].substring(0, 2);
+      }
+      this.setData({ inputPerTxTea: val });
+    } else {
+      // 固定模式：只允许正整数
+      const val = rawVal.replace(/[^\d]/g, '');
+      this.setData({ inputPerTxTea: val });
+    }
   },
 
   submitTeaConfig: function () {
     const totalStr = String(this.data.inputTotalTea).trim();
     const perStr = String(this.data.inputPerTxTea).trim();
+    const mode = this.data.inputTeaMode;
 
-    // 校验输入非空时必须是大于0的正整数
+    // 校验输入非空时必须是合法正数
     if (totalStr !== '' && (!/^\d+$/.test(totalStr) || parseInt(totalStr) <= 0)) {
       wx.showToast({ title: '总茶水钱必须是正数', icon: 'none' });
       return;
     }
-    if (perStr !== '' && (!/^\d+$/.test(perStr) || parseInt(perStr) <= 0)) {
+    if (perStr !== '' && (!/^\d+(\.\d+)?$/.test(perStr) || parseFloat(perStr) <= 0)) {
       wx.showToast({ title: '每笔扣除必须是正数', icon: 'none' });
       return;
     }
 
     const total = totalStr === '' ? 0 : parseInt(totalStr);
-    const per = perStr === '' ? 0 : parseInt(perStr);
+    const per = perStr === '' ? 0 : parseFloat(perStr);
 
-    if (per > total && total > 0) {
+    if (mode === 0 && per > total && total > 0) {
       wx.showToast({ title: '每笔扣除不能大于总茶水钱', icon: 'none' });
+      return;
+    }
+    if (mode === 1 && per > 100) {
+      wx.showToast({ title: '百分比不能超过100%', icon: 'none' });
       return;
     }
 
@@ -400,13 +449,13 @@ Page({
       data: {
         room_id: this.data.roomId,
         total_tea_money: total,
-        tea_money_per_tx: per
+        tea_money_per_tx: per,
+        tea_mode: mode
       },
       loading: true,
       loadingTitle: '正在保存配置...'
     }).then(() => {
       this.setData({ showTeaModal: false });
-      // 成功后，下一秒的轮询会自动同步状态
     }).catch(() => {});
   },
 
@@ -555,7 +604,7 @@ Page({
           deduct_tea: this.data.deductTeaChecked
         },
         loading: true,
-        loadingTitle: '正在记分...'
+        loadingTitle: '正在记账...'
       }).then(() => {
         this.setData({ showScoreModal: false });
         // 成功后，下一秒的轮询自动更新页面分数
@@ -571,7 +620,7 @@ Page({
     if (this.data.roomInfo.status === 1) return;
 
     wx.showModal({
-      title: '撤销计分',
+      title: '撤销记账',
       content: `确定撤销 [${tx.from_nickname} ➔ ${tx.to_nickname} +${tx.amount}分] 这笔交易吗？分数和茶水钱都将退回。`,
       success: (res) => {
         if (res.confirm) {

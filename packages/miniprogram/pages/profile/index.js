@@ -74,5 +74,13 @@ Page({
 
   goBack: function () {
     wx.navigateBack({ delta: 1 });
+  },
+
+  goToRoom: function (e) {
+    const roomId = e.currentTarget.dataset.roomId;
+    const roomCode = e.currentTarget.dataset.roomCode;
+    wx.navigateTo({
+      url: `/pages/room/index?id=${roomId}&code=${roomCode}`
+    });
   }
 });

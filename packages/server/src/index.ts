@@ -292,6 +292,7 @@ app.get('/api/room/qrcode', async (c) => {
 // 5. 创建房间并自动加入
 app.post('/api/room/create', async (c) => {
   try {
+    await ensureSchema(c.env.DB);
     const user = await authenticate(c.req.raw, c.env.DB);
     const body = await c.req.json().catch(() => ({}));
     
@@ -346,6 +347,7 @@ app.post('/api/room/create', async (c) => {
 // 6. 加入房间
 app.post('/api/room/join', async (c) => {
   try {
+    await ensureSchema(c.env.DB);
     const user = await authenticate(c.req.raw, c.env.DB);
     const body = await c.req.json();
     const roomCode = body.room_code;
@@ -398,13 +400,14 @@ app.post('/api/room/join', async (c) => {
 // 7. 设置/修改茶水钱
 app.post('/api/room/set-tea', async (c) => {
   try {
+    await ensureSchema(c.env.DB);
     await authenticate(c.req.raw, c.env.DB);
     const body = await c.req.json();
-    const { room_id, total_tea_money, tea_money_per_tx } = body;
+    const { room_id, total_tea_money, tea_money_per_tx, tea_mode } = body;
 
     await c.env.DB.batch([
-      c.env.DB.prepare('UPDATE rooms SET total_tea_money = ?, tea_money_per_tx = ?, version = version + 1 WHERE id = ?')
-        .bind(total_tea_money, tea_money_per_tx, room_id)
+      c.env.DB.prepare('UPDATE rooms SET total_tea_money = ?, tea_money_per_tx = ?, tea_mode = ?, version = version + 1 WHERE id = ?')
+        .bind(total_tea_money, tea_money_per_tx, tea_mode || 0, room_id)
     ]);
     await broadcastRoomUpdate(room_id, c.env.DB, c.env.ROOM_DO);
 
@@ -417,6 +420,7 @@ app.post('/api/room/set-tea', async (c) => {
 // 8. 记分 (支持普通记分和自己交茶水费，兼具零和事务及撤销兼容)
 app.post('/api/room/score', async (c) => {
   try {
+    await ensureSchema(c.env.DB);
     await authenticate(c.req.raw, c.env.DB);
     const body = await c.req.json();
     const { room_id, from_user_id, to_user_id, amount, deduct_tea } = body;
@@ -480,7 +484,16 @@ app.post('/api/room/score', async (c) => {
       if (deduct_tea && room.tea_money_per_tx > 0) {
         const remainingTea = room.total_tea_money - room.accumulated_tea_money;
         if (remainingTea > 0) {
-          teaDeducted = Math.min(room.tea_money_per_tx, remainingTea, amount);
+          if (room.tea_mode === 1) {
+            // 百分比模式：按百分比扣除，最多保留两位小数
+            const calculated = amount * (room.tea_money_per_tx / 100);
+            teaDeducted = Math.min(calculated, remainingTea, amount);
+            // 保留最多两位小数
+            teaDeducted = Math.round(teaDeducted * 100) / 100;
+          } else {
+            // 固定金额模式
+            teaDeducted = Math.min(room.tea_money_per_tx, remainingTea, amount);
+          }
         }
       }
 
@@ -593,6 +606,7 @@ app.post('/api/room/undo', async (c) => {
 // 10. 智能对账轮询 (1秒1次低消耗设计)
 app.get('/api/room/poll', async (c) => {
   try {
+    await ensureSchema(c.env.DB);
     await authenticate(c.req.raw, c.env.DB);
     const roomId = parseInt(c.req.query('room_id') || '0');
     const localVersion = parseInt(c.req.query('local_version') || '0');
@@ -635,11 +649,11 @@ app.get('/api/room/poll', async (c) => {
       .prepare(
         'SELECT t.id, t.from_user_id, u1.nickname as from_nickname, \
                 t.to_user_id, COALESCE(u2.nickname, \'茶水金库\') as to_nickname, \
-                t.amount, t.tea_deducted, t.created_at \
+                t.amount, t.tea_deducted, t.is_undone, t.created_at \
          FROM transactions t \
          JOIN users u1 ON t.from_user_id = u1.id \
          LEFT JOIN users u2 ON t.to_user_id = u2.id \
-         WHERE t.room_id = ? AND t.is_undone = 0 \
+         WHERE t.room_id = ? \
          ORDER BY t.id DESC'
       )
       .bind(roomId)
@@ -697,7 +711,12 @@ app.get('/api/user/history', async (c) => {
     const history = await c.env.DB
       .prepare(
         'SELECT r.id as room_id, r.room_code, u.nickname as owner_nickname, \
-                ru.score as final_score, r.accumulated_tea_money, r.created_at \
+                ru.score as final_score, r.accumulated_tea_money, r.created_at, \
+                r.status as room_status, \
+                (SELECT group_concat(u2.nickname, \'、\') \
+                 FROM room_users ru2 \
+                 JOIN users u2 ON ru2.user_id = u2.id \
+                 WHERE ru2.room_id = r.id) as player_names \
          FROM room_users ru \
          JOIN rooms r ON ru.room_id = r.id \
          JOIN users u ON r.owner_id = u.id \
@@ -734,6 +753,14 @@ app.get('/api/user/history', async (c) => {
 });
 
 // ==================== 数据库辅助方法 ====================
+
+async function ensureSchema(db: D1Database) {
+  try {
+    await db.prepare("ALTER TABLE rooms ADD COLUMN tea_mode INTEGER DEFAULT 0").run();
+  } catch (e) {
+    // 列已存在，忽略
+  }
+}
 
 async function dbGetOrCreateUser(db: D1Database, openid: string) {
   let user = await db
@@ -790,11 +817,11 @@ async function broadcastRoomUpdate(roomId: any, db: D1Database, roomDoNamespace:
       .prepare(
         'SELECT t.id, t.from_user_id, u1.nickname as from_nickname, \
                 t.to_user_id, COALESCE(u2.nickname, \'茶水金库\') as to_nickname, \
-                t.amount, t.tea_deducted, t.created_at \
+                t.amount, t.tea_deducted, t.is_undone, t.created_at \
          FROM transactions t \
          JOIN users u1 ON t.from_user_id = u1.id \
          LEFT JOIN users u2 ON t.to_user_id = u2.id \
-         WHERE t.room_id = ? AND t.is_undone = 0 \
+         WHERE t.room_id = ? \
          ORDER BY t.id DESC'
       )
       .bind(cleanRoomId)

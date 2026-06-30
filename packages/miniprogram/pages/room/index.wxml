@@ -13,7 +13,11 @@
     <view class="glass-card room-header-card">
       <view class="justify-between align-center">
         <view class="flex-column">
-          <text class="card-section-title">🍵 茶水金库</text>
+          <view class="flex-row align-center">
+            <text class="card-section-title">🍵 茶水金库</text>
+            <text class="tea-mode-desc" wx:if="{{roomInfo.tea_money_per_tx > 0}}">{{roomInfo.tea_mode === 1 ? '（按百分比：' + roomInfo.tea_money_per_tx + '%）' : '（固定金额：' + roomInfo.tea_money_per_tx + '分）'}}</text>
+            <text class="tea-mode-desc" wx:else>（未设置）</text>
+          </view>
           <view class="tea-stats" style="margin-top: 10rpx;">
             <text class="tea-current">{{roomInfo.accumulated_tea_money || 0}}</text>
             <text class="tea-slash">/</text>
@@ -22,7 +26,7 @@
         </view>
         
         <view class="header-actions flex-column">
-          <van-button size="normal" custom-class="btn-outline" custom-style="width: 170rpx; height: 62rpx; line-height: 60rpx; font-size: 24rpx; font-weight: 500; border-radius: 12rpx; white-space: nowrap;" bindtap="showTeaPopup">设置茶水</van-button>
+          <van-button size="normal" custom-class="btn-outline" custom-style="width: 170rpx; height: 62rpx; line-height: 60rpx; font-size: 24rpx; font-weight: 500; border-radius: 12rpx; white-space: nowrap;" bindtap="showTeaPopup" wx:if="{{roomInfo.status !== 1}}">设置茶水</van-button>
           <van-button size="normal" custom-class="btn-green" custom-style="width: 170rpx; height: 62rpx; line-height: 60rpx; font-size: 24rpx; font-weight: 500; border-radius: 12rpx; margin-top: 16rpx; white-space: nowrap;" wx:if="{{isOwner && roomInfo.status === 0}}" bindtap="confirmSettleRoom">结算游戏</van-button>
         </view>
       </view>
@@ -41,7 +45,7 @@
     </view>
 
     <!-- 邀请与分享按钮栏 -->
-    <view class="room-action-bar flex-row justify-between">
+    <view class="room-action-bar flex-row justify-between" wx:if="{{roomInfo.status !== 1}}">
       <button class="action-btn flex-center btn-blue-shadow" open-type="share">
         <van-icon name="share-o" size="16px" style="margin-right: 10rpx;" />
         <text>邀请微信好友</text>
@@ -59,14 +63,14 @@
           <text class="section-icon">👥</text>
           <text>房间玩家 ({{players.length}}人)</text>
         </view>
-        <view class="section-right flex-row align-center">
-          <text class="section-tip" style="margin-right: 12rpx;">💡 点击头像可计分</text>
+        <view class="section-right flex-row align-center" wx:if="{{roomInfo.status !== 1}}">
+          <text class="section-tip" style="margin-right: 12rpx;">💡 点击头像可记账</text>
           <!-- 手动刷新按钮 (带旋转图标动效) -->
           <view class="refresh-action flex-row align-center" bindtap="forceRefreshData">
             <view class="refresh-icon-container {{isRefreshing ? 'spinning' : ''}}">
               <van-icon name="replay" size="12px" color="#0b9b77" />
             </view>
-            <text class="refresh-text">刷新分数</text>
+            <text class="refresh-text">刷新记账</text>
           </view>
         </view>
       </view>
@@ -102,31 +106,53 @@
 
     <!-- 对账流水账 -->
     <view class="glass-card tx-history-card">
-      <text class="card-section-title">📜 计分流水对账单</text>
+      <view class="bill-header-row justify-between align-center" style="margin-bottom: 20rpx;">
+        <text class="card-section-title">📜 记账流水对账单</text>
+        <!-- 账单筛选 Tab 切换 -->
+        <view class="bill-tabs flex-row">
+          <view class="bill-tab {{activeBillTab === 'total' ? 'active' : ''}}" bindtap="switchBillTab" data-tab="total">总账单</view>
+          <view class="bill-tab {{activeBillTab === 'personal' ? 'active' : ''}}" bindtap="switchBillTab" data-tab="personal">个人账单</view>
+        </view>
+      </view>
+      
       <view class="tx-list" style="margin-top: 20rpx;">
-        <view class="tx-item justify-between align-center" wx:for="{{transactions}}" wx:key="id">
+        <view class="tx-item justify-between align-center {{item.is_undone === 1 ? 'undone-item' : ''}}" wx:for="{{activeBillTab === 'total' ? transactions : personalTransactions}}" wx:key="id">
+          <!-- 撤销状态遮罩层 -->
+          <view class="tx-undone-mask flex-center" wx:if="{{item.is_undone === 1}}">
+            <text class="tx-undone-text">已撤销</text>
+          </view>
+
           <view class="tx-detail-box flex-column">
             <view class="tx-flow align-center">
-              <text class="tx-user-name">{{item.from_nickname}}</text>
+              <text class="tx-user-name {{item.from_user_id === myUserId ? 'my-name' : ''}}">{{item.from_nickname}}</text>
               <text class="tx-arrow">➔</text>
-              <text class="tx-user-name text-green-glow">{{item.to_nickname}}</text>
+              <text class="tx-user-name {{item.to_user_id === myUserId ? 'my-name' : ''}}">{{item.to_nickname}}</text>
             </view>
             <text class="tx-time">{{item.created_at}}</text>
           </view>
           
           <view class="tx-right-box align-center">
             <view class="tx-scores flex-column align-end">
-              <text class="tx-amount">+{{item.amount}} 分</text>
+              <!-- 个人账单模式：展示支出- / 收入+ 符号与特定着色 -->
+              <block wx:if="{{activeBillTab === 'personal'}}">
+                <text class="tx-amount {{item.from_user_id === myUserId ? 'tx-amount-expense' : 'tx-amount-income'}}">
+                  {{item.from_user_id === myUserId ? '-' : '+'}}{{item.amount}} 分
+                </text>
+              </block>
+              <!-- 总账单模式：按现在的规则展示（无 + / - 符号） -->
+              <block wx:else>
+                <text class="tx-amount">{{item.amount}} 分</text>
+              </block>
               <text class="tx-tea-detail" wx:if="{{item.tea_deducted > 0}}">(扣茶水 {{item.tea_deducted}})</text>
             </view>
-            <!-- 撤销按钮 -->
-            <view class="tx-undo-btn flex-center" catchtap="onUndoTap" data-tx="{{item}}">
+            <!-- 撤销按钮 (仅在非撤销状态，且房间未结算时展示，同时规定只能由收入方/收款人操作撤销) -->
+            <view class="tx-undo-btn flex-center" catchtap="onUndoTap" data-tx="{{item}}" wx:if="{{item.is_undone !== 1 && roomInfo.status !== 1 && item.to_user_id === myUserId}}">
               <van-icon name="revoke" size="16px" color="#ee0a24" />
             </view>
           </view>
         </view>
-        <view class="tx-empty flex-center" wx:if="{{transactions.length === 0}}">
-          <text>暂无计分记录，点击上方玩家头像开始吧~</text>
+        <view class="tx-empty flex-center" wx:if="{{(activeBillTab === 'total' && transactions.length === 0) || (activeBillTab === 'personal' && personalTransactions.length === 0)}}">
+          <text>暂无记账记录，点击上方玩家头像开始吧~</text>
         </view>
       </view>
     </view>
@@ -175,14 +201,26 @@
         bind:change="onTotalTeaChange"
         input-align="right"
       />
+
+      <!-- 扣除方式选择器 -->
+      <view class="tea-mode-selector flex-row align-center justify-between" style="padding: 24rpx 0rpx; border-bottom: 1px solid rgba(0, 0, 0, 0.04);">
+        <text class="tea-mode-label" style="font-size: 28rpx; color: #1e2a27;">扣除方式</text>
+        <view class="tea-mode-tabs flex-row">
+          <view class="tea-mode-tab {{inputTeaMode === 0 ? 'active' : ''}}" bindtap="changeTeaMode" data-mode="{{0}}">固定金额</view>
+          <view class="tea-mode-tab {{inputTeaMode === 1 ? 'active' : ''}}" bindtap="changeTeaMode" data-mode="{{1}}">按百分比</view>
+        </view>
+      </view>
+
       <van-field
-        label="每笔扣除"
-        type="number"
-        placeholder="每笔带茶水交易扣除的分数"
+        label="{{inputTeaMode === 1 ? '扣除比例' : '每笔扣除 (分)'}}"
+        type="{{inputTeaMode === 1 ? 'digit' : 'number'}}"
+        placeholder="{{inputTeaMode === 1 ? '每笔交易扣除的百分比' : '每笔带茶水交易扣除的固定分数'}}"
         value="{{inputPerTxTea}}"
         bind:change="onPerTxTeaChange"
         input-align="right"
-      />
+      >
+        <text slot="button" wx:if="{{inputTeaMode === 1}}" style="color: #1e2a27; font-size: 28rpx; margin-left: 10rpx; font-weight: 500;">%</text>
+      </van-field>
       
       <view class="popup-actions flex-row justify-between" style="margin-top: 40rpx; width: 100%;">
         <view style="width: 48%;">
@@ -206,7 +244,7 @@
     <view class="score-popup-content flex-column" style="padding: 40rpx;">
       <!-- 根据是给自己交茶水还是给别人记分，自适应显示标题 -->
       <view class="popup-title" style="margin-bottom: {{isPureTea ? '8rpx' : '30rpx'}};">
-        {{isPureTea ? '🍵 缴纳茶水费' : '✏️ 给【' + selectedPlayer.nickname + '】记分'}}
+        {{isPureTea ? '🍵 缴纳茶水费' : '✏️ 给【' + selectedPlayer.nickname + '】记账'}}
       </view>
       
       <!-- 如果是交茶水，将“我的分数”展示在标题下方 -->
@@ -247,7 +285,7 @@
       <view class="tea-switch-row justify-between align-center" wx:if="{{!isPureTea && roomInfo.tea_money_per_tx > 0 && roomInfo.accumulated_tea_money < roomInfo.total_tea_money}}">
         <view class="flex-column">
           <text class="switch-title">是否扣除茶水费</text>
-          <text class="switch-desc">开启将从此笔分值中扣除 {{roomInfo.tea_money_per_tx}} 分计入茶水</text>
+          <text class="switch-desc">开启将从此笔分值中扣除 {{roomInfo.tea_money_per_tx}}{{roomInfo.tea_mode === 1 ? '%' : ' 分'}}计入茶水</text>
         </view>
         <van-switch checked="{{ deductTeaChecked }}" active-color="#06d6a0" bind:change="onTeaSwitchChange" />
       </view>
@@ -258,7 +296,7 @@
         </view>
         <view style="width: 48%;">
           <van-button custom-class="btn-green" block disabled="{{!selectedPayerId || !inputScore}}" bindtap="submitScore">
-            {{isPureTea ? '确认缴纳' : '确认计分'}}
+            {{isPureTea ? '确认缴纳' : '确认记账'}}
           </van-button>
         </view>
       </view>
@@ -283,7 +321,7 @@
           <text class="mvp-badge">MVP</text>
         </view>
         <text class="mvp-name">{{mvpPlayer.nickname}}</text>
-        <text class="mvp-score">+{{mvpPlayer.score}} 分</text>
+        <text class="mvp-score {{mvpPlayer.score > 0 ? 'score-positive' : (mvpPlayer.score < 0 ? 'score-negative' : 'score-zero')}}">{{mvpPlayer.score > 0 ? '+' : ''}}{{mvpPlayer.score}} 分</text>
       </view>
 
       <!-- 排行榜列表 -->
