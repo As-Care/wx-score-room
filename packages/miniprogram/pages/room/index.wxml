@@ -75,33 +75,37 @@
         </view>
       </view>
 
-      <!-- 统一使用卡片网格排版：1/2/4人一排2个，3人及大于4人一排3个 -->
-      <view class="players-grid-container {{ (players.length === 3 || players.length > 4) ? 'grid-cols-3' : 'grid-cols-2' }}">
-        <view 
-          class="player-card glass-card" 
-          wx:for="{{players}}" 
-          wx:key="user_id" 
-          bindtap="onPlayerTap" 
-          data-user="{{item}}"
-        >
-          <!-- 头像区域（包含挂在头像上方的“我”字标签，彻底剥离头像框防止裁切） -->
-          <view class="player-avatar-container">
-            <view class="me-badge" wx:if="{{item.user_id === myUserId}}">我</view>
-            <view class="player-avatar-box flex-center">
-              <image class="player-avatar" src="{{item.avatar_url}}" mode="aspectFill" wx:if="{{item.avatar_url}}"></image>
-              <view class="player-avatar-text flex-center" wx:else>
-                {{item.nickname[0] || '?'}}
+      <!-- 统一的横向滚动/弹性平铺区域：1-5人平铺，超过5人支持向右流畅横向滑动，绑定动态人数类以完美自适应宽度 -->
+      <scroll-view class="players-scroll-container players-count-{{players.length}}" scroll-x="{{players.length > 5}}" enhanced show-scrollbar="{{false}}">
+        <view class="players-row flex-row">
+          <view 
+            class="player-card glass-card" 
+            wx:for="{{players}}" 
+            wx:key="user_id" 
+            bindtap="onPlayerTap" 
+            data-user="{{item}}"
+          >
+            <!-- 头像区域（包含挂在头像上方的“我”字标签） -->
+            <view class="player-avatar-container">
+              <view class="me-badge" wx:if="{{item.user_id === myUserId}}">我</view>
+              <view class="player-avatar-box flex-center">
+                <image class="player-avatar" src="{{item.avatar_url}}" mode="aspectFill" wx:if="{{item.avatar_url}}"></image>
+                <view class="player-avatar-text flex-center" wx:else>
+                  {{item.nickname[0] || '?'}}
+                </view>
+              </view>
+            </view>
+            
+            <!-- 昵称与得分 -->
+            <view class="player-info-box flex-column">
+              <view class="player-nickname ellipsis">{{item.nickname}}</view>
+              <view class="player-score {{item.score > 0 ? 'score-positive' : (item.score < 0 ? 'score-negative' : 'score-zero')}}">
+                {{item.score > 0 ? '+' + item.score : item.score}}
               </view>
             </view>
           </view>
-          
-          <!-- 昵称与得分 -->
-          <view class="player-info-box flex-column">
-            <view class="player-nickname ellipsis">{{item.nickname}}</view>
-            <view class="player-score {{item.score > 0 ? 'score-positive' : (item.score < 0 ? 'score-negative' : 'score-zero')}}">{{item.score > 0 ? '+' + item.score : item.score}} 分</view>
-          </view>
         </view>
-      </view>
+      </scroll-view>
     </view>
 
     <!-- 对账流水账 -->

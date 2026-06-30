@@ -129,6 +129,8 @@ Page({
           const myId = app.globalData.userInfo ? app.globalData.userInfo.id : 0;
           const personalTxs = (data.transactions || []).filter(t => t.from_user_id === myId || t.to_user_id === myId);
 
+          const isJustSettled = this.data.roomInfo.status === 0;
+
           this.setData({
             roomInfo: room,
             players: data.players || [],
@@ -142,10 +144,13 @@ Page({
             isOwner: room.owner_id === myId
           });
 
-          // 检查结算状态
+          // 检查结算状态 (只有当房间原本处于进行中 status === 0，而新接收为已结算 status === 1 时，才判定为“刚刚结算”，此时全员弹出海报)
           if (room.status === 1) {
             this.closeWebSocket();
-            this.showSettleReportPage(data.players || []);
+            this.stopPolling();
+            if (isJustSettled) {
+              this.showSettleReportPage(data.players || []);
+            }
           }
         }
       } catch (err) {
@@ -217,6 +222,8 @@ Page({
         const myId = app.globalData.userInfo ? app.globalData.userInfo.id : 0;
         const personalTxs = transactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
 
+        const isJustSettled = this.data.roomInfo.status === 0;
+
         this.setData({
           roomInfo: room,
           players: players,
@@ -230,10 +237,13 @@ Page({
           isOwner: room.owner_id === myId
         });
 
-        // 核心检查：如果房间已结算，自动停止轮询并弹出结算大赢家海报
+        // 核心检查：如果房间已结算，自动停止轮询并根据情况弹出结算大赢家海报
         if (room.status === 1) {
           this.closeWebSocket();
-          this.showSettleReportPage(players);
+          this.stopPolling();
+          if (isJustSettled) {
+            this.showSettleReportPage(players);
+          }
         }
       }
     }).catch(err => {
@@ -278,6 +288,8 @@ Page({
       const myId = app.globalData.userInfo ? app.globalData.userInfo.id : 0;
       const personalTxs = transactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
       
+      const isJustSettled = this.data.roomInfo.status === 0;
+
       this.setData({
         roomInfo: room,
         players: players,
@@ -293,10 +305,13 @@ Page({
       
       wx.showToast({ title: '分数已同步', icon: 'success', duration: 800 });
       
-      // 如果房间已结算，同样做停止轮询处理
+      // 如果房间已结算，同样做停止轮询并根据情况弹窗处理
       if (room.status === 1) {
         this.closeWebSocket();
-        this.showSettleReportPage(players);
+        this.stopPolling();
+        if (isJustSettled) {
+          this.showSettleReportPage(players);
+        }
       }
     }).catch(err => {
       this.setData({ isRefreshing: false });

@@ -1,12 +1,18 @@
 /* 房间页样式表 */
 
 .room-page {
-  padding-bottom: 60rpx;
+  height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .content-wrapper {
   display: flex;
   flex-direction: column;
+  flex: 1; /* 吃满除导航栏外的全部垂直高度 */
+  min-height: 0; /* 防止子元素内容溢出撑爆布局 */
+  box-sizing: border-box;
 }
 
 /* 头部状态卡片 */
@@ -128,7 +134,7 @@
 
 /* 玩家列表排版区 */
 .players-section {
-  margin: 20rpx 30rpx;
+  margin: 20rpx 30rpx 0;
 }
 
 .section-header {
@@ -155,43 +161,71 @@
   color: var(--text-secondary);
 }
 
-/* 统一的网格大卡片容器 */
-.players-grid-container {
-  display: grid;
-  gap: 20rpx;
+/* 横向滚动列表容器 (添加 padding-bottom 留出阴影渲染空间，消除切阴影黑线) */
+.players-scroll-container {
+  width: 100%;
+  white-space: nowrap;
+  margin-bottom: 12rpx;
+  box-sizing: border-box;
 }
 
-/* 1/2/4人 一排2个 */
-.grid-cols-2 {
-  grid-template-columns: 1fr 1fr;
+.players-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap; /* 强行单行排布 */
+  width: 100%;
+  box-sizing: border-box;
+  gap: 12rpx; /* 卡片之间的间距 */
+  padding: 6rpx 4rpx 8rpx 4rpx; /* 没有阴影后，底部内边距收紧为 8rpx，使整体更紧凑 */
 }
 
-/* 3人及大于4人 一排3个 */
-.grid-cols-3 {
-  grid-template-columns: 1fr 1fr 1fr;
-}
-
-/* 统一玩家卡片样式 */
+/* 统一玩家卡片样式 (设定基础样式，去除阴影，应用轻盈微边框) */
 .player-card {
+  flex: 0 0 calc((100% - 48rpx) / 5); /* 默认 5 个以上时固定为 20% 宽度 */
   margin: 0 !important;
-  padding: 24rpx 12rpx !important; /* 压缩内边距以保障在一行3个时文字不挤压折行 */
+  padding: 16rpx 4rpx !important;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  box-sizing: border-box;
+  min-width: 0;
+  box-shadow: none !important; /* 彻底去除用户卡片阴影效果 */
+  border: 1px solid rgba(11, 40, 34, 0.07) !important; /* 精致淡色实体描边，代替投影界定边缘 */
 }
 
-/* 头像外层独立的 container，用来在头像外面正上方绝对定位【我】字 */
+/* 1和2个人的时候宽度为 33% (平分 3 等分) */
+.players-count-1 .player-card,
+.players-count-2 .player-card {
+  flex: 0 0 calc((100% - 24rpx) / 3);
+}
+
+/* 3个人的时候宽度为等分 (3 等分) */
+.players-count-3 .player-card {
+  flex: 0 0 calc((100% - 24rpx) / 3);
+}
+
+/* 4个人的时候宽度为等分 (4 等分) */
+.players-count-4 .player-card {
+  flex: 0 0 calc((100% - 36rpx) / 4);
+}
+
+/* 5个人的时候宽度为等分 (5 等分) */
+.players-count-5 .player-card {
+  flex: 0 0 calc((100% - 48rpx) / 5);
+}
+
+/* 头像外层独立的 container */
 .player-avatar-container {
   position: relative;
-  margin-bottom: 12rpx;
-  margin-top: 12rpx;
+  margin-bottom: 8rpx;
+  margin-top: 6rpx;
 }
 
-/* 通用头像及文字代用头像 */
+/* 通用头像及文字代用头像 (尺寸整体变小至 80rpx * 80rpx) */
 .player-avatar-box {
-  width: 100rpx;
-  height: 100rpx;
+  width: 80rpx;
+  height: 80rpx;
   border-radius: 50%;
   overflow: hidden;
   background-color: rgba(0, 0, 0, 0.02);
@@ -210,7 +244,7 @@
   border-radius: 50%;
   background: linear-gradient(135deg, #e6f2f0 0%, #b2ebd8 100%);
   color: var(--theme-color-green);
-  font-size: 32rpx;
+  font-size: 26rpx; /* 文字代用头像字体略微收小 */
   font-weight: bold;
 }
 
@@ -220,19 +254,19 @@
 }
 
 .player-nickname {
-  font-size: 28rpx;
+  font-size: 24rpx; /* 昵称字体稍微收小，防止在一行折行 */
   color: #1e2a27;
   font-weight: bold;
-  max-width: 100%;
-  line-height: 36rpx; /* 精细设定行高，消除文字默认多余的上下空距 */
-  margin-bottom: 6rpx; /* 代替多余的空行，提供优雅的 6rpx 紧凑间隙 */
+  max-width: 95%;
+  line-height: 32rpx;
+  margin-bottom: 4rpx;
 }
 
 .player-score {
   font-weight: bold;
-  font-size: 34rpx;
-  line-height: 40rpx; /* 精细设定行高，消除多余空距 */
-  margin-top: 8rpx;
+  font-size: 28rpx; /* 分数数值字体微调为 28rpx，防止大位数溢出 */
+  line-height: 34rpx;
+  margin-top: 6rpx;
 }
 
 .score-positive {
@@ -249,16 +283,24 @@
   color: #1e2a27;
 }
 
-/* 对账流水账 */
+/* 对账流水账 (占用页面剩余空间，并在小屏上撑开最小高度) */
 .tx-history-card {
-  padding: 30rpx;
+  padding: 30rpx 30rpx 10rpx 30rpx;
+  flex: 1; /* 自动撑满剩余高度 */
+  display: flex;
+  flex-direction: column;
+  min-height: 520rpx; /* 卡片整体最小高度为 520rpx，适配极小屏手机 */
+  box-sizing: border-box;
+  margin-bottom: 24rpx !important;
 }
 
 .tx-list {
   display: flex;
   flex-direction: column;
-  max-height: 480rpx;
+  flex: 1; /* 列表占据卡片内部剩余全部高度 */
+  min-height: 0; /* 允许高度在 flex 内收缩以正常唤起滚动条 */
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tx-item {
