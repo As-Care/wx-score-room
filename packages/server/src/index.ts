@@ -72,7 +72,10 @@ async function fetchOpenId(code: string, bindings: Bindings): Promise<string> {
   const appid = bindings.WX_APPID || '';
   const secret = bindings.WX_SECRET || '';
 
+  console.log(`[fetchOpenId] appid='${appid}', secretLength=${secret.length}, code='${code}'`);
+
   if (!appid || !secret || code.startsWith('test_') || code === 'the code is a mock one') {
+    console.log(`[fetchOpenId] falling back to mock openid because conditions met: appid_empty=${!appid}, secret_empty=${!secret}`);
     return `mock_openid_${code}`;
   }
 
