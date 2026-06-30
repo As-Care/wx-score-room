@@ -706,12 +706,15 @@ app.post('/api/room/settle', async (c) => {
   }
 });
 
-// 12. 个人中心战绩历史查询 (过滤没有得分/茶水的“空对局”房间)
+// 12. 个人中心战绩历史查询 (过滤没有得分/茶水的“空对局”房间，增加分页支持)
 app.get('/api/user/history', async (c) => {
   try {
     const user = await authenticate(c.req.raw, c.env.DB);
+    const page = parseInt(c.req.query('page') || '1');
+    const limit = parseInt(c.req.query('limit') || '20');
+    const offset = (page - 1) * limit;
 
-    // 查询参与的房间历史记录 (过滤没有有效未撤销记分流水的空对局房间)
+    // 查询参与的房间历史记录 (过滤没有有效未撤销记分流水的空对局房间，进行 LIMIT OFFSET 分页)
     const history = await c.env.DB
       .prepare(
         'SELECT r.id as room_id, r.room_code, u.nickname as owner_nickname, \
@@ -726,9 +729,10 @@ app.get('/api/user/history', async (c) => {
          JOIN users u ON r.owner_id = u.id \
          WHERE ru.user_id = ? \
            AND EXISTS (SELECT 1 FROM transactions t WHERE t.room_id = r.id AND t.is_undone = 0) \
-         ORDER BY r.id DESC'
+         ORDER BY r.id DESC \
+         LIMIT ? OFFSET ?'
       )
-      .bind(user.id)
+      .bind(user.id, limit, offset)
       .all<any>();
 
     // 共同游戏过战友聚合排名
@@ -747,9 +751,30 @@ app.get('/api/user/history', async (c) => {
       .bind(user.id, user.id)
       .all<any>();
 
+    // 汇总查询用户的总对局数、赢输数及总积分统计 (用于全局大卡片展示，不受列表分页 LIMIT 影响)
+    const summary = await c.env.DB
+      .prepare(
+        'SELECT COUNT(1) as total, \
+                SUM(CASE WHEN ru.score > 0 THEN 1 ELSE 0 END) as wins, \
+                SUM(CASE WHEN ru.score < 0 THEN 1 ELSE 0 END) as losses, \
+                SUM(ru.score) as total_score \
+         FROM room_users ru \
+         JOIN rooms r ON ru.room_id = r.id \
+         WHERE ru.user_id = ? \
+           AND EXISTS (SELECT 1 FROM transactions t WHERE t.room_id = r.id AND t.is_undone = 0)'
+      )
+      .bind(user.id)
+      .first<any>();
+
     return jsonOk({
       history: history.results,
-      friends: friends.results
+      friends: friends.results,
+      summary: {
+        total: summary?.total || 0,
+        wins: summary?.wins || 0,
+        losses: summary?.losses || 0,
+        total_score: summary?.total_score || 0
+      }
     });
   } catch (err: any) {
     return jsonErr(401, err.message || '未授权操作');

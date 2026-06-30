@@ -19,7 +19,8 @@
     "van-switch": "/miniprogram_npm/@vant/weapp/switch/index",
     "van-toast": "/miniprogram_npm/@vant/weapp/toast/index",
     "van-notify": "/miniprogram_npm/@vant/weapp/notify/index",
-    "van-overlay": "/miniprogram_npm/@vant/weapp/overlay/index"
+    "van-overlay": "/miniprogram_npm/@vant/weapp/overlay/index",
+    "van-loading": "/miniprogram_npm/@vant/weapp/loading/index"
   },
   "sitemapLocation": "sitemap.json"
 }

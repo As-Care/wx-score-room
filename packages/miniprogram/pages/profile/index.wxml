@@ -100,6 +100,17 @@
           </view>
         </view>
         
+        <!-- 分页底部加载提示 -->
+        <view class="load-more-section flex-center" wx:if="{{historyRooms.length > 0}}" style="padding: 30rpx 0; margin-bottom: 20rpx;">
+          <view class="load-loading flex-row align-center flex-center" wx:if="{{isLoading}}">
+            <van-loading size="16px" type="spinner" color="#0b9b77" custom-class="loading-spin" />
+            <text class="load-text" style="font-size: 24rpx; color: #809a96; margin-left: 12rpx;">正在加载更多对局...</text>
+          </view>
+          <view class="load-nomore flex-center" wx:elif="{{!hasMore}}">
+            <text class="load-nomore-text" style="font-size: 22rpx; color: #b2c4c1; letter-spacing: 2rpx;">— 已加载全部历史对局 —</text>
+          </view>
+        </view>
+        
         <view class="empty-state flex-column flex-center" wx:if="{{historyRooms.length === 0}}">
           <van-icon name="todo-list-o" size="48px" color="#809a96" />
           <text class="empty-text">你还没有参与过任何游戏对局</text>

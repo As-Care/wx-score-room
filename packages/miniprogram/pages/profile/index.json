@@ -1,1 +1,5 @@
-{}
+{
+  "navigationBarTitleText": "战绩中心",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

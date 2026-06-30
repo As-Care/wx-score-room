@@ -303,10 +303,12 @@
     </view>
   </van-popup>
 
-  <!-- 弹窗 4：结算大赢家海报弹窗 (结算后不可关闭，只提供返回首页按钮) -->
+  <!-- 弹窗 4：结算大赢家海报弹窗 (提供关闭和返回大厅双按钮) -->
   <van-popup
     show="{{ showSettleReport }}"
     round
+    closeable
+    bind:close="onCloseSettleReport"
     custom-style="width: 85%; padding: 40rpx; border-radius: 40rpx; background: radial-gradient(circle at 50% 30%, #f7f9f8 0%, #edf2f0 100%);"
   >
     <view class="settle-popup-content flex-column flex-center">
@@ -342,7 +344,14 @@
         <text>🍵 本局共收取茶水费: {{roomInfo.accumulated_tea_money}} 分</text>
       </view>
 
-      <van-button custom-class="btn-green" custom-style="width: 100%; height: 92rpx; line-height: 92rpx; white-space: nowrap; font-size: 30rpx; margin-top: 45rpx;" block bindtap="exitRoomToHome">返回游戏大厅</van-button>
+      <view class="settle-actions flex-row justify-between" style="width: 100%; margin-top: 45rpx;">
+        <view style="width: 48%;">
+          <van-button custom-class="btn-outline" custom-style="height: 92rpx; line-height: 90rpx; font-size: 30rpx; white-space: nowrap;" block bindtap="onCloseSettleReport">关闭</van-button>
+        </view>
+        <view style="width: 48%;">
+          <van-button custom-class="btn-green" custom-style="height: 92rpx; line-height: 92rpx; white-space: nowrap; font-size: 30rpx;" block bindtap="exitRoomToHome">返回游戏大厅</van-button>
+        </view>
+      </view>
     </view>
   </van-popup>
 </view>

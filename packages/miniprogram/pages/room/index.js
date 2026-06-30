@@ -138,7 +138,8 @@ Page({
             teaProgress: progress,
             inputTotalTea: room.total_tea_money || '',
             inputPerTxTea: room.tea_money_per_tx || '',
-            myUserId: myId
+            myUserId: myId,
+            isOwner: room.owner_id === myId
           });
 
           // 检查结算状态
@@ -225,7 +226,8 @@ Page({
           teaProgress: progress,
           inputTotalTea: room.total_tea_money || '',
           inputPerTxTea: room.tea_money_per_tx || '',
-          myUserId: myId
+          myUserId: myId,
+          isOwner: room.owner_id === myId
         });
 
         // 核心检查：如果房间已结算，自动停止轮询并弹出结算大赢家海报
@@ -285,7 +287,8 @@ Page({
         teaProgress: progress,
         inputTotalTea: room.total_tea_money || '',
         inputPerTxTea: room.tea_money_per_tx || '',
-        myUserId: myId
+        myUserId: myId,
+        isOwner: room.owner_id === myId
       });
       
       wx.showToast({ title: '分数已同步', icon: 'success', duration: 800 });
@@ -305,6 +308,11 @@ Page({
   switchBillTab: function (e) {
     const tab = e.currentTarget.dataset.tab;
     this.setData({ activeBillTab: tab });
+  },
+
+  // 关闭结算海报弹窗
+  onCloseSettleReport: function () {
+    this.setData({ showSettleReport: false });
   },
 
   // 退出房间回到首页大厅
