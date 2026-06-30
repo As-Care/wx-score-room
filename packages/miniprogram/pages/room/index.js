@@ -34,10 +34,15 @@ Page({
     // 结算数据
     sortedPlayers: [],
     mvpPlayer: null,
-    myUserId: 0
+    myUserId: 0,
+    isRefreshing: false,
+
+    // 个人信息编辑数据
+    avatarUrl: '',
+    nickname: ''
   },
 
-  intervalId: null, // 用于轮询的定时器 ID
+  socketTask: null, // 用于实时同步的 WebSocket 实例
 
   onLoad: function (options) {
     // 1. 设置导航适配高度
@@ -50,17 +55,23 @@ Page({
       qrCodeUrl: '',
       myUserId: app.globalData.userInfo ? app.globalData.userInfo.id : 0
     });
+  },
 
-    // 2. 立即拉取一次房间数据
+  onShow: function () {
+    // 1. 页面切回前台、从后台恢复、解锁屏幕时，立即主动拉取一次最新数据，保证状态最新
     this.pollRoomData();
+    // 2. 建立 WebSocket 实时推送长连接，取代原先的每秒请求，实现真正零延迟
+    this.connectWebSocket();
+  },
 
-    // 3. 启动 1 秒 1 次的智能轮询
-    this.startPolling();
+  onHide: function () {
+    // 页面隐藏、切后台或熄屏时，关闭 WebSocket 连接以省电并释放服务器资源
+    this.closeWebSocket();
   },
 
   onUnload: function () {
-    // 页面销毁时，务必清除定时器，释放资源
-    this.stopPolling();
+    // 页面关闭销毁时，彻底关闭并释放 WebSocket 连接
+    this.closeWebSocket();
   },
 
   // 微信转发/分享房间设置 (分享到聊天窗口)
@@ -72,23 +83,110 @@ Page({
     };
   },
 
-  // 启动智能轮询
-  startPolling: function () {
-    this.stopPolling(); // 确保安全，先清除之前的
-    this.intervalId = setInterval(() => {
-      this.pollRoomData();
-    }, 1000);
+  // 建立 WebSocket 连接实现 0 延迟实时推送
+  connectWebSocket: function () {
+    this.closeWebSocket(); // 确保安全，先关闭已有的连接
+
+    const apiProtocol = app.globalData.apiUrl.startsWith('https') ? 'wss' : 'ws';
+    // 防御处理：去除开头协议和结尾的斜杠，防止出现双斜线导致微信 WS 解析失败
+    const domain = app.globalData.apiUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const wsUrl = `${apiProtocol}://${domain}/api/room/ws?room_id=${this.data.roomId}&token=${app.globalData.token}`;
+
+    console.log('正在建立 WebSocket 实时同步连接:', wsUrl);
+
+    // 建立小程序 WebSocket
+    const socketTask = wx.connectSocket({
+      url: wsUrl,
+      success: () => {
+        console.log('WebSocket 发起连接成功');
+      },
+      fail: (err) => {
+        console.error('WebSocket 发起连接失败', err);
+      }
+    });
+
+    this.socketTask = socketTask;
+
+    socketTask.onOpen(() => {
+      console.log('WebSocket 连接已成功建立');
+    });
+
+    socketTask.onMessage((res) => {
+      try {
+        const data = JSON.parse(res.data);
+        if (data.type === 'update') {
+          console.log('收到房间实时更新推送:', data);
+          // 计算茶水钱进度百分比
+          let progress = 0;
+          const room = data.room;
+          if (room.total_tea_money > 0) {
+            progress = Math.min(100, Math.floor((room.accumulated_tea_money / room.total_tea_money) * 100));
+          }
+
+          this.setData({
+            roomInfo: room,
+            players: data.players || [],
+            transactions: data.transactions || [],
+            localVersion: room.version,
+            teaProgress: progress,
+            inputTotalTea: room.total_tea_money || '',
+            inputPerTxTea: room.tea_money_per_tx || '',
+            myUserId: app.globalData.userInfo ? app.globalData.userInfo.id : 0
+          });
+
+          // 检查结算状态
+          if (room.status === 1) {
+            this.closeWebSocket();
+            this.showSettleReportPage(data.players || []);
+          }
+        }
+      } catch (err) {
+        console.error('解析 WebSocket 推送数据失败', err);
+      }
+    });
+
+    socketTask.onClose((res) => {
+      console.log('WebSocket 连接已断开', res);
+      // 如果不是我们主动清空的，说明是异常断开（比如网络瞬断），尝试自动重连
+      if (this.socketTask === socketTask) {
+        this.socketTask = null;
+        // 如果页面依然处于可见状态，尝试延时自动重连
+        if (!this.reconnectTimer && this.data.roomId) {
+          console.log('检测到非主动断开，准备 3 秒后尝试自动重连...');
+          this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null;
+            // 确保页面可见且没有正在进行的连接才进行重连
+            if (!this.socketTask) {
+              this.connectWebSocket();
+            }
+          }, 3000);
+        }
+      }
+    });
+
+    socketTask.onError((err) => {
+      console.error('WebSocket 连接发生异常', err);
+      this.socketTask = null;
+    });
   },
 
-  // 清除轮询
-  stopPolling: function () {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
+  // 关闭并释放 WebSocket 连接
+  closeWebSocket: function () {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.socketTask) {
+      this.socketTask.close({
+        success: () => {
+          console.log('主动关闭 WebSocket 成功');
+        }
+      });
+      this.socketTask = null;
     }
   },
 
-  // 轮询核心请求
+  // 主动拉取核心请求 (比如在 onShow 切前台时，主动获取一次分数，保证数据绝对正确)
   pollRoomData: function () {
     if (!this.data.roomId) return;
 
@@ -121,12 +219,12 @@ Page({
 
         // 核心检查：如果房间已结算，自动停止轮询并弹出结算大赢家海报
         if (room.status === 1) {
-          this.stopPolling();
+          this.closeWebSocket();
           this.showSettleReportPage(players);
         }
       }
     }).catch(err => {
-      console.error('房间轮询同步失败', err);
+      console.error('房间数据同步失败', err);
     });
   },
 
@@ -140,6 +238,51 @@ Page({
       sortedPlayers: sorted,
       mvpPlayer: mvp,
       showSettleReport: true
+    });
+  },
+
+  // 手动强制同步刷新分数 (无视版本对比直接全量覆盖刷新)
+  forceRefreshData: function () {
+    if (this.data.isRefreshing || !this.data.roomId) return;
+    this.setData({ isRefreshing: true });
+    
+    app.request({
+      // 传入 local_version = -1，强制后端直接下发最新完整数据，避开对比缓存优化
+      url: `/api/room/poll?room_id=${this.data.roomId}&local_version=-1`,
+      method: 'GET'
+    }).then(res => {
+      this.setData({ isRefreshing: false });
+      
+      const room = res.room;
+      const players = res.players || [];
+      const transactions = res.transactions || [];
+      
+      let progress = 0;
+      if (room.total_tea_money > 0) {
+        progress = Math.min(100, Math.floor((room.accumulated_tea_money / room.total_tea_money) * 100));
+      }
+      
+      this.setData({
+        roomInfo: room,
+        players: players,
+        transactions: transactions,
+        localVersion: room.version,
+        teaProgress: progress,
+        inputTotalTea: room.total_tea_money || '',
+        inputPerTxTea: room.tea_money_per_tx || '',
+        myUserId: app.globalData.userInfo ? app.globalData.userInfo.id : 0
+      });
+      
+      wx.showToast({ title: '分数已同步', icon: 'success', duration: 800 });
+      
+      // 如果房间已结算，同样做停止轮询处理
+      if (room.status === 1) {
+        this.closeWebSocket();
+        this.showSettleReportPage(players);
+      }
+    }).catch(err => {
+      this.setData({ isRefreshing: false });
+      console.error('手动刷新分数失败', err);
     });
   },
 
@@ -325,7 +468,9 @@ Page({
         selectedPayerId: myId,
         inputScore: '',
         deductTeaChecked: false, // 缴纳茶水不显示扣除茶水开关
-        showScoreModal: true
+        showScoreModal: true,
+        avatarUrl: app.globalData.userInfo ? (app.globalData.userInfo.avatar_url || '') : (myPlayer.avatar_url || ''),
+        nickname: app.globalData.userInfo ? (app.globalData.userInfo.nickname || '') : (myPlayer.nickname || '')
       });
     } else {
       // 2. 如果点击的是其他玩家，默认且强制指定由我（当前用户）给他付分
@@ -445,6 +590,99 @@ Page({
           }).catch(() => {});
         }
       }
+    });
+  },
+
+  // 微信快捷选择头像回调 (最新规范)
+  onChooseAvatar: function (e) {
+    const { avatarUrl } = e.detail;
+    
+    // 调用微信底层的上传接口将本地临时头像上传至 Cloudflare R2 存储库中
+    wx.showLoading({ title: '上传头像中...', mask: true });
+    wx.uploadFile({
+      url: `${app.globalData.apiUrl}/api/upload`,
+      filePath: avatarUrl,
+      name: 'file',
+      header: {
+        'Authorization': `Bearer ${app.globalData.token}`
+      },
+      success: (res) => {
+        wx.hideLoading();
+        try {
+          const apiRes = JSON.parse(res.data);
+          if (apiRes.code === 0 && apiRes.data?.avatarUrl) {
+            const onlineUrl = apiRes.data.avatarUrl;
+            this.setData({ avatarUrl: onlineUrl });
+          } else {
+            wx.showToast({ title: apiRes.message || '头像保存失败', icon: 'none' });
+          }
+        } catch (err) {
+          wx.showToast({ title: '解析上传数据失败', icon: 'none' });
+        }
+      },
+      fail: (err) => {
+        wx.hideLoading();
+        wx.showToast({ title: '网络上传失败，请检查网络', icon: 'none' });
+      }
+    });
+  },
+
+  // 微信快捷填入昵称失去焦点回调 (最新规范)
+  onNicknameBlur: function (e) {
+    const nickname = e.detail.value;
+    this.setData({ nickname });
+  },
+
+  onNicknameInput: function (e) {
+    this.setData({
+      nickname: e.detail.value
+    });
+  },
+
+  // 保存个人信息并且刷新房间信息
+  saveProfile: function () {
+    const nickname = this.data.nickname.trim();
+    const avatarUrl = this.data.avatarUrl;
+    
+    if (!nickname) {
+      wx.showToast({ title: '昵称不能为空', icon: 'none' });
+      return;
+    }
+    
+    wx.showLoading({ title: '保存中...', mask: true });
+    
+    app.request({
+      url: '/api/user/update',
+      method: 'POST',
+      data: {
+        nickname: nickname,
+        avatar_url: avatarUrl
+      }
+    }).then(updatedUser => {
+      wx.hideLoading();
+      app.globalData.userInfo = updatedUser;
+      wx.setStorageSync('userInfo', updatedUser);
+      wx.showToast({ title: '保存成功', icon: 'success' });
+      
+      // 更新当前页面数据以反映新改的个人信息
+      this.setData({
+        myUserId: updatedUser.id
+      });
+
+      // 触发后端广播更新，这样其他人的屏幕也会立即看到我的新头像和昵称！
+      app.request({
+        url: '/api/room/broadcast-update',
+        method: 'POST',
+        data: {
+          room_id: this.data.roomId
+        }
+      }).catch((err) => {
+        console.error('触发修改个人信息广播失败', err);
+      });
+    }).catch(err => {
+      wx.hideLoading();
+      wx.showToast({ title: '保存失败', icon: 'none' });
+      console.error('手动保存个人信息失败', err);
     });
   }
 });

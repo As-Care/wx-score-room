@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 type Bindings = {
   DB: D1Database;
   AVATARS: R2Bucket; // 关联的 Cloudflare R2 存储库
+  ROOM_DO: DurableObjectNamespace;
   WX_APPID?: string;
   WX_SECRET?: string;
 };
@@ -380,6 +381,7 @@ app.post('/api/room/join', async (c) => {
         c.env.DB.prepare('INSERT INTO room_users (room_id, user_id, score) VALUES (?, ?, 0)').bind(room.id, user.id),
         c.env.DB.prepare('UPDATE rooms SET version = version + 1 WHERE id = ?').bind(room.id)
       ]);
+      await broadcastRoomUpdate(room.id, c.env.DB, c.env.ROOM_DO);
     }
 
     return jsonOk(room);
@@ -399,6 +401,7 @@ app.post('/api/room/set-tea', async (c) => {
       c.env.DB.prepare('UPDATE rooms SET total_tea_money = ?, tea_money_per_tx = ?, version = version + 1 WHERE id = ?')
         .bind(total_tea_money, tea_money_per_tx, room_id)
     ]);
+    await broadcastRoomUpdate(room_id, c.env.DB, c.env.ROOM_DO);
 
     return jsonOk({ status: 'ok' });
   } catch (err: any) {
@@ -458,6 +461,7 @@ app.post('/api/room/score', async (c) => {
       ];
 
       await c.env.DB.batch(statements);
+      await broadcastRoomUpdate(room_id, c.env.DB, c.env.ROOM_DO);
       return jsonOk({ status: 'ok' });
     } else {
       // 2. 普通记分（由 from_user_id 付分给 to_user_id）
@@ -495,6 +499,7 @@ app.post('/api/room/score', async (c) => {
       }
 
       await c.env.DB.batch(statements);
+      await broadcastRoomUpdate(room_id, c.env.DB, c.env.ROOM_DO);
       return jsonOk({ status: 'ok' });
     }
   } catch (err: any) {
@@ -567,6 +572,7 @@ app.post('/api/room/undo', async (c) => {
     }
 
     await c.env.DB.batch(statements);
+    await broadcastRoomUpdate(room_id, c.env.DB, c.env.ROOM_DO);
 
     return jsonOk({ status: 'ok' });
   } catch (err: any) {
@@ -664,6 +670,7 @@ app.post('/api/room/settle', async (c) => {
       .prepare('UPDATE rooms SET status = 1, version = version + 1 WHERE id = ?')
       .bind(room_id)
       .run();
+    await broadcastRoomUpdate(room_id, c.env.DB, c.env.ROOM_DO);
 
     return jsonOk({ status: 'ok' });
   } catch (err: any) {
@@ -739,6 +746,191 @@ async function dbGetOrCreateUser(db: D1Database, openid: string) {
   }
 
   return user;
+}
+
+// ==================== 实时广播及 WebSocket 同步方案 ====================
+
+// 实时广播更新给房间内所有在线玩家
+async function broadcastRoomUpdate(roomId: any, db: D1Database, roomDoNamespace: DurableObjectNamespace) {
+  try {
+    const cleanRoomId = typeof roomId === 'string' ? parseInt(roomId) : roomId;
+    if (isNaN(cleanRoomId)) return;
+
+    // 1. 获取最新房间状态
+    const room = await db
+      .prepare('SELECT * FROM rooms WHERE id = ?')
+      .bind(cleanRoomId)
+      .first<any>();
+
+    if (!room) return;
+
+    // 2. 获取最新成员列表
+    const players = await db
+      .prepare(
+        'SELECT ru.user_id, u.nickname, u.avatar_url, ru.score \
+         FROM room_users ru \
+         JOIN users u ON ru.user_id = u.id \
+         WHERE ru.room_id = ?'
+      )
+      .bind(cleanRoomId)
+      .all<any>();
+
+    // 3. 获取最新流水列表
+    const transactions = await db
+      .prepare(
+        'SELECT t.id, t.from_user_id, u1.nickname as from_nickname, \
+                t.to_user_id, COALESCE(u2.nickname, \'茶水金库\') as to_nickname, \
+                t.amount, t.tea_deducted, t.created_at \
+         FROM transactions t \
+         JOIN users u1 ON t.from_user_id = u1.id \
+         LEFT JOIN users u2 ON t.to_user_id = u2.id \
+         WHERE t.room_id = ? AND t.is_undone = 0 \
+         ORDER BY t.id DESC'
+      )
+      .bind(cleanRoomId)
+      .all<any>();
+
+    let teaProgress = 0;
+    if (room.total_tea_money > 0) {
+      teaProgress = Math.min(100, Math.floor((room.accumulated_tea_money / room.total_tea_money) * 100));
+    }
+
+    const payload = {
+      type: 'update',
+      room,
+      players: players.results || [],
+      transactions: transactions.results || [],
+      teaProgress
+    };
+
+    // 4. 寻址并调用 Durable Object 实例进行广播
+    const id = roomDoNamespace.idFromName(String(cleanRoomId));
+    const stub = roomDoNamespace.get(id);
+    await stub.fetch(new Request('https://do/broadcast', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }));
+  } catch (err) {
+    console.error('实时广播通知失败', err);
+  }
+}
+
+// 供前端在特定修改（如房间内改头像昵称后）手动触发实时同步广播的 API
+app.post('/api/room/broadcast-update', async (c) => {
+  try {
+    await authenticate(c.req.raw, c.env.DB);
+    const body = await c.req.json();
+    const { room_id } = body;
+    if (!room_id) {
+      return jsonErr(400, '缺失房间ID');
+    }
+    await broadcastRoomUpdate(room_id, c.env.DB, c.env.ROOM_DO);
+    return jsonOk({ status: 'ok' });
+  } catch (err: any) {
+    return jsonErr(401, err.message || '操作失败');
+  }
+});
+
+// WebSocket 握手代理端点 (带房间鉴权校验)
+app.get('/api/room/ws', async (c) => {
+  const roomId = c.req.query('room_id');
+  const token = c.req.query('token');
+
+  if (!roomId || !token) {
+    return c.text('Missing room_id or token', 400);
+  }
+
+  const parsedRoomId = parseInt(roomId);
+  if (isNaN(parsedRoomId)) {
+    return c.text('Invalid room_id', 400);
+  }
+
+  // 1. 鉴权检验
+  let user;
+  try {
+    user = await c.env.DB
+      .prepare('SELECT id FROM users WHERE openid = ?')
+      .bind(token)
+      .first<any>();
+  } catch (e) {
+    return c.text('Unauthorized', 401);
+  }
+
+  if (!user) {
+    return c.text('Unauthorized', 401);
+  }
+
+  // 2. 检验是否是该房间成员，防止串房监听
+  const member = await c.env.DB
+    .prepare('SELECT 1 FROM room_users WHERE room_id = ? AND user_id = ?')
+    .bind(parsedRoomId, user.id)
+    .first();
+
+  if (!member) {
+    return c.text('Forbidden', 403);
+  }
+
+  // 3. 寻址 Durable Object 建立 WebSocket
+  const id = c.env.ROOM_DO.idFromName(String(parsedRoomId));
+  const stub = c.env.ROOM_DO.get(id);
+
+  return stub.fetch(c.req.raw);
+});
+
+// Durable Object 房间房间网关类 (利用 WebSocket Hibernation API 节省计算时长 Duration)
+export class RoomDO implements DurableObject {
+  state: DurableObjectState;
+
+  constructor(state: DurableObjectState, env: Bindings) {
+    this.state = state;
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+
+    // 内部接口：触发广播
+    if (url.pathname === '/broadcast') {
+      const body = await request.text();
+      const websockets = this.state.getWebSockets();
+      for (const ws of websockets) {
+        try {
+          ws.send(body);
+        } catch (e) {
+          // 忽略已断连的套接字
+        }
+      }
+      return new Response('OK');
+    }
+
+    // 外部接口：建立 WebSocket 升级
+    if (request.headers.get("Upgrade") !== "websocket") {
+      return new Response("Expected Upgrade: websocket", { status: 426 });
+    }
+
+    const pair = new WebSocketPair();
+    const [client, server] = Object.values(pair);
+
+    // 接受并使连接“休眠”挂起，极大程度节省计算 GB-s 消耗
+    this.state.acceptWebSocket(server);
+
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+    });
+  }
+
+  // 以下方法属于 WebSocket Hibernation 必须的生命周期回调
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    // 微信小程序客户端不需要上传命令，这里用作心跳维持或记录
+  }
+
+  async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean): Promise<void> {
+    ws.close();
+  }
+
+  async webSocketError(ws: WebSocket, error: any): Promise<void> {
+    ws.close();
+  }
 }
 
 export default app;

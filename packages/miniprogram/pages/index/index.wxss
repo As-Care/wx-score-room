@@ -13,6 +13,7 @@
 /* 个人信息设置卡片 */
 .profile-setup-card {
   margin-top: 20rpx;
+  padding-bottom: 40rpx;
   display: flex;
   flex-direction: column;
   align-items: center;

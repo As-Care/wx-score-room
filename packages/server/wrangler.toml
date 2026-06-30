@@ -10,3 +10,12 @@ database_id = "2858e78d-5e9a-40bd-8593-68ee660e7187"
 [[r2_buckets]]
 binding = "AVATARS"
 bucket_name = "wx-score-room-bucket"
+
+[durable_objects]
+bindings = [
+  { name = "ROOM_DO", class_name = "RoomDO" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RoomDO"]
