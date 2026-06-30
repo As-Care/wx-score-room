@@ -10,8 +10,8 @@
     <!-- 个人信息卡片 (毛玻璃) -->
     <view class="glass-card profile-setup-card">
       <view class="card-header">
-        <text class="setup-title">👤 设置游戏身份</text>
-        <text class="setup-subtitle">设置后亲友可以更容易认出你</text>
+        <view class="setup-title">👤 设置游戏身份</view>
+        <view class="setup-subtitle">设置后亲友可以更容易认出你</view>
       </view>
       
       <view class="avatar-nickname-box flex-column flex-center">
@@ -29,6 +29,9 @@
 
         <!-- 微信最新规范：获取昵称输入框 -->
         <input type="nickname" class="nickname-input" placeholder="请输入游戏昵称" value="{{nickname}}" bindblur="onNicknameBlur" bindinput="onNicknameInput" />
+
+        <!-- 显式保存个人信息按钮，明确提示下次免设置 -->
+        <van-button custom-class="btn-green" style="width: 80%; margin-top: 40rpx;" block bindtap="saveProfile">保存个人信息</van-button>
       </view>
     </view>
 

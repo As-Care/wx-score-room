@@ -156,6 +156,37 @@ Page({
     });
   },
 
+  // 显式保存个人信息，弹出提示并持久化到数据库
+  saveProfile: function () {
+    const nickname = this.data.nickname.trim();
+    const avatarUrl = this.data.avatarUrl;
+    
+    if (!nickname) {
+      wx.showToast({ title: '昵称不能为空', icon: 'none' });
+      return;
+    }
+    
+    wx.showLoading({ title: '保存中...', mask: true });
+    
+    app.request({
+      url: '/api/user/update',
+      method: 'POST',
+      data: {
+        nickname: nickname,
+        avatar_url: avatarUrl
+      }
+    }).then(updatedUser => {
+      wx.hideLoading();
+      app.globalData.userInfo = updatedUser;
+      wx.setStorageSync('userInfo', updatedUser);
+      wx.showToast({ title: '保存成功', icon: 'success' });
+    }).catch(err => {
+      wx.hideLoading();
+      wx.showToast({ title: '保存失败', icon: 'none' });
+      console.error('手动保存个人信息失败', err);
+    });
+  },
+
   // 创建房间并自动进入
   onCreateRoom: function () {
     if (!this.data.nickname.trim()) {

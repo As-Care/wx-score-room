@@ -46,8 +46,7 @@ Page({
       roomId: parseInt(options.room_id) || 0,
       roomCode: options.room_code || '',
       isOwner: options.is_owner === 'true',
-      // 拼接一个让 index.js 能识别的参数格式作为二维码的 payload
-      qrCodeUrl: encodeURIComponent(`code=${options.room_code}`)
+      qrCodeUrl: ''
     });
 
     // 2. 立即拉取一次房间数据
@@ -164,6 +163,29 @@ Page({
   // 二维码弹窗管理
   showQRCodePopup: function () {
     this.setData({ showQRCode: true });
+    
+    // 如果已经加载了有效的二维码地址，免去重复载入
+    if (this.data.qrCodeUrl && this.data.qrCodeUrl.startsWith('http')) {
+      return;
+    }
+
+    // 自适应感知当前小程序的运行环境 (develop-开发版 / trial-体验版 / release-正式版)
+    const accountInfo = wx.getAccountInfoSync();
+    const envVersion = accountInfo.miniProgram.envVersion || 'release';
+
+    wx.showLoading({ title: '加载中...', mask: true });
+    app.request({
+      url: `/api/room/qrcode?room_code=${this.data.roomCode}&env_version=${envVersion}`,
+      method: 'GET'
+    }).then(res => {
+      wx.hideLoading();
+      if (res && res.qrCodeUrl) {
+        this.setData({ qrCodeUrl: res.qrCodeUrl });
+      }
+    }).catch(err => {
+      wx.hideLoading();
+      console.error('获取微信小程序码失败', err);
+    });
   },
 
   onCloseQRCode: function () {

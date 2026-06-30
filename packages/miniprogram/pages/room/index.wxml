@@ -130,8 +130,8 @@
       <text class="popup-title">房间二维码</text>
       <text class="popup-subtitle">让亲友扫码直接加入游戏</text>
       
-      <!-- 使用第三方 API 动态绘制的高清二维码图片 -->
-      <image class="qr-code-img" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={{qrCodeUrl}}" mode="aspectFit"></image>
+      <!-- 使用微信官方小程序码接口（菊花码）渲染，自带高速 R2 缓存 -->
+      <image class="qr-code-img" src="{{qrCodeUrl}}" mode="aspectFit"></image>
       
       <view class="room-code-display flex-column flex-center" bindtap="copyRoomCode">
         <text class="code-label">房间号</text>

@@ -191,6 +191,88 @@ app.get('/api/avatar/avatars/:filename', async (c) => {
   }
 });
 
+// 4.1 微信小程序码生成与 R2 缓存接口 (带优雅兜底与运行环境自适应)
+app.get('/api/room/qrcode', async (c) => {
+  try {
+    const roomCode = c.req.query('room_code');
+    const envVersion = c.req.query('env_version') || 'release'; // 获取前端感知到的当前小程序所处环境
+
+    if (!roomCode) {
+      return jsonErr(400, '缺失房间号');
+    }
+
+    const appid = c.env.WX_APPID || '';
+    const secret = c.env.WX_SECRET || '';
+
+    // 防御校验，确保传给微信接口的环境参数合法 (必须是 develop / trial / release)
+    let wechatEnv = 'release';
+    if (['develop', 'trial', 'release'].includes(envVersion)) {
+      wechatEnv = envVersion;
+    }
+
+    // 缓存 Key 拼装加入运行环境，彻底隔开开发、体验、正式版，防止串环境扫码错乱
+    const cacheKey = `qrcodes/${roomCode}_${wechatEnv}.png`;
+    const originUrl = `https://score-room.ashang.cloud/${cacheKey}`;
+
+    // 1. 优先查 R2 缓存，若已有该房间码则直接返回
+    const cachedObject = await c.env.AVATARS.get(cacheKey);
+    if (cachedObject) {
+      return jsonOk({ qrCodeUrl: originUrl });
+    }
+
+    // 2. 降级判断：如未配小程序凭证或为本地假环境，直接返回标准普通方形微信二维码（用户手机依然可扫码入房）
+    if (!appid || !secret || appid.startsWith('test') || appid === 'touristappid') {
+      const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent('https://wx-score-room.ashang.cloud?room_code=' + roomCode)}`;
+      return jsonOk({ qrCodeUrl: fallbackUrl });
+    }
+
+    // 3. 获取微信 Access Token
+    const tokenUrl = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appid}&secret=${secret}`;
+    const tokenRes = await fetch(tokenUrl);
+    const tokenData = (await tokenRes.json()) as any;
+    if (!tokenData.access_token) {
+      throw new Error('Access Token 获取失败');
+    }
+
+    const accessToken = tokenData.access_token;
+
+    // 4. 调用微信官方 getwxacodeunlimit 接口获取菊花小程序码
+    const qrcodeUrl = `https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=${accessToken}`;
+    const qrcodeRes = await fetch(qrcodeUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scene: `code=${roomCode}`, // 场景值为房间号
+        page: 'pages/index/index', // 首页
+        width: 280,
+        check_path: false, // 设为 false，开发/体验阶段跳过微信侧的路径发布校验
+        env_version: wechatEnv // 动态使用前端传入的环境参数，实现体验版/生产版完美适配
+      })
+    });
+
+    // 微信错误判断
+    const contentType = qrcodeRes.headers.get('content-type') || '';
+    if (contentType.includes('json')) {
+      const errJson = (await qrcodeRes.json()) as any;
+      throw new Error(`微信生成失败: ${JSON.stringify(errJson)}`);
+    }
+
+    const arrayBuffer = await qrcodeRes.arrayBuffer();
+
+    // 5. 存入 R2 bucket 持久化
+    await c.env.AVATARS.put(cacheKey, arrayBuffer, {
+      httpMetadata: { contentType: 'image/png' }
+    });
+
+    return jsonOk({ qrCodeUrl: originUrl });
+  } catch (err: any) {
+    console.error('微信生成小程序码失败，执行安全降级：', err);
+    // 降级兜底返回普通二维码
+    const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent('https://wx-score-room.ashang.cloud?room_code=' + roomCode)}`;
+    return jsonOk({ qrCodeUrl: fallbackUrl });
+  }
+});
+
 // 5. 创建房间并自动加入
 app.post('/api/room/create', async (c) => {
   try {

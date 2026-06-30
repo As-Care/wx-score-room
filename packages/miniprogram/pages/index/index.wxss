@@ -26,15 +26,13 @@
 .setup-title {
   font-size: 32rpx;
   font-weight: bold;
-  color: #ffffff;
-  display: block;
+  color: #1e2a27;
 }
 
 .setup-subtitle {
   font-size: 24rpx;
   color: var(--text-secondary);
-  display: block;
-  margin-top: 6rpx;
+  margin-top: 8rpx;
 }
 
 .avatar-nickname-box {
@@ -93,12 +91,14 @@
 .nickname-input {
   width: 80%;
   height: 80rpx;
+  min-height: 80rpx;
+  line-height: 80rpx;
   text-align: center;
   font-size: 34rpx;
   font-weight: 600;
   color: #1e2a27;
   border-bottom: 2rpx solid rgba(0, 0, 0, 0.1);
-  padding: 10rpx 0;
+  padding: 0; /* 彻底移除导致占位符和输入内容高度不一致的上下 padding */
 }
 
 .nickname-input:focus {
