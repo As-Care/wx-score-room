@@ -448,6 +448,11 @@ app.post('/api/room/score', async (c) => {
       const remainingTea = room.total_tea_money - room.accumulated_tea_money;
       const actualTea = Math.min(amount, remainingTea);
 
+      // 确保 id = 0 的“茶水金库”系统用户存在，以防止外键约束失败
+      await c.env.DB.prepare(
+        "INSERT OR IGNORE INTO users (id, openid, nickname, avatar_url) VALUES (0, 'system_tea_vault', '茶水金库', '')"
+      ).run();
+
       const statements = [
         // 缴纳人扣除分值 (即使分数为0扣后变负数也允许)
         c.env.DB.prepare('UPDATE room_users SET score = score - ? WHERE room_id = ? AND user_id = ?')
