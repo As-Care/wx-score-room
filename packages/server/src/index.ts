@@ -295,6 +295,9 @@ app.post('/api/room/create', async (c) => {
     await ensureSchema(c.env.DB);
     const user = await authenticate(c.req.raw, c.env.DB);
     const body = await c.req.json().catch(() => ({}));
+
+    // 被动清理所有过期房间
+    await cleanupExpiredRooms(c.env.DB);
     
     // 如果有传入头像昵称，顺便同步
     if (body.nickname) {
@@ -828,6 +831,9 @@ app.get('/api/user/history', async (c) => {
   try {
     const user = await authenticate(c.req.raw, c.env.DB);
 
+    // 触发被动清理：先自动删除超时的单人无用房间，保证数据不残留
+    await cleanupExpiredRooms(c.env.DB);
+
     const page = parseInt(c.req.query('page') || '1');
     const limit = parseInt(c.req.query('limit') || '20');
     const offset = (page - 1) * limit;
@@ -935,6 +941,29 @@ app.get('/api/user/history', async (c) => {
 
 
 // ==================== 数据库辅助方法 ====================
+
+async function cleanupExpiredRooms(db: D1Database) {
+  try {
+    const expiredRooms = await db.prepare(`
+      SELECT id FROM rooms 
+      WHERE status = 0 
+        AND created_at < datetime('now', '-30 minutes')
+        AND (SELECT COUNT(1) FROM room_users ru WHERE ru.room_id = rooms.id) <= 1
+    `).all<any>();
+
+    if (expiredRooms.results && expiredRooms.results.length > 0) {
+      const roomIds = expiredRooms.results.map((r: any) => r.id);
+      for (const roomId of roomIds) {
+        await db.prepare('DELETE FROM transactions WHERE room_id = ?').bind(roomId).run();
+        await db.prepare('DELETE FROM room_users WHERE room_id = ?').bind(roomId).run();
+        await db.prepare('DELETE FROM rooms WHERE id = ?').bind(roomId).run();
+        console.log(`[Passive Cleanup] 成功清理超时的单人无效房间 ID: ${roomId}`);
+      }
+    }
+  } catch (err) {
+    console.error('[Passive Cleanup] 自动清理出错:', err);
+  }
+}
 
 async function ensureSchema(db: D1Database) {
   try {
@@ -1233,29 +1262,9 @@ export default {
   // 定时任务处理器：定期异步清理超时的单人空置房间 (超过 30 分钟)
   async scheduled(event: any, env: any, ctx: any) {
     ctx.waitUntil((async () => {
-      try {
-        console.log('[Cron Cleanup] 开始执行定时清理 (30分钟单人空房检测)...');
-        const abandonedRooms = await env.DB.prepare(`
-          SELECT id FROM rooms 
-          WHERE status = 0 
-            AND created_at < datetime('now', '-30 minutes')
-            AND (SELECT COUNT(1) FROM room_users ru WHERE ru.room_id = rooms.id) <= 1
-        `).all<any>();
-
-        if (abandonedRooms.results && abandonedRooms.results.length > 0) {
-          const roomIds = abandonedRooms.results.map((r: any) => r.id);
-          for (const roomId of roomIds) {
-            // 级联清理
-            await env.DB.prepare('DELETE FROM transactions WHERE room_id = ?').bind(roomId).run();
-            await env.DB.prepare('DELETE FROM room_users WHERE room_id = ?').bind(roomId).run();
-            await env.DB.prepare('DELETE FROM rooms WHERE id = ?').bind(roomId).run();
-            console.log(`[Cron Cleanup] 成功清理超时的单人无效房间 ID: ${roomId}`);
-          }
-          console.log(`[Cron Cleanup] 定时清理完毕，共清理 ${roomIds.length} 个空房间。`);
-        }
-      } catch (err) {
-        console.error('[Cron Cleanup] 自动清理出错:', err);
-      }
+      console.log('[Cron Cleanup] 开始执行定时清理 (30分钟单人空房检测)...');
+      await cleanupExpiredRooms(env.DB);
+      console.log('[Cron Cleanup] 定时清理完毕。');
     })());
   }
 };
