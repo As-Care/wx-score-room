@@ -161,7 +161,11 @@ Page({
           const formattedPlayers = (data.players || []).map(p => ({
             ...p,
             score: this.sanitizeScore(p.score)
-          }));
+          })).sort((a, b) => {
+            if (a.user_id === myId) return -1;
+            if (b.user_id === myId) return 1;
+            return 0;
+          });
           const formattedTransactions = (data.transactions || []).map(t => ({
             ...t,
             tea_deducted: this.sanitizeScore(t.tea_deducted),
@@ -268,7 +272,11 @@ Page({
         const formattedPlayers = (players || []).map(p => ({
           ...p,
           score: this.sanitizeScore(p.score)
-        }));
+        })).sort((a, b) => {
+          if (a.user_id === myId) return -1;
+          if (b.user_id === myId) return 1;
+          return 0;
+        });
         const formattedTransactions = (transactions || []).map(t => ({
           ...t,
           tea_deducted: this.sanitizeScore(t.tea_deducted),
@@ -360,7 +368,11 @@ Page({
       const formattedPlayers = (players || []).map(p => ({
         ...p,
         score: this.sanitizeScore(p.score)
-      }));
+      })).sort((a, b) => {
+        if (a.user_id === myId) return -1;
+        if (b.user_id === myId) return 1;
+        return 0;
+      });
       const formattedTransactions = (transactions || []).map(t => ({
         ...t,
         tea_deducted: this.sanitizeScore(t.tea_deducted),
@@ -513,8 +525,16 @@ Page({
   },
 
   onTotalTeaChange: function (e) {
-    // 强制正则过滤掉所有非数字字符（包含负号、小数点、字母等），防范源头输入错误
-    const val = String(e.detail).replace(/[^\d]/g, '');
+    const rawVal = String(e.detail);
+    // 允许输入最多两位小数的浮点数
+    let val = rawVal.replace(/[^\d.]/g, '');
+    const parts = val.split('.');
+    if (parts.length > 2) {
+      val = parts[0] + '.' + parts.slice(1).join('');
+    }
+    if (parts[1] && parts[1].length > 2) {
+      val = parts[0] + '.' + parts[1].substring(0, 2);
+    }
     this.setData({ inputTotalTea: val });
   },
 
@@ -528,22 +548,16 @@ Page({
 
   onPerTxTeaChange: function (e) {
     const rawVal = String(e.detail);
-    if (this.data.inputTeaMode === 1) {
-      // 百分比模式：允许输入最多两位小数的浮点数
-      let val = rawVal.replace(/[^\d.]/g, '');
-      const parts = val.split('.');
-      if (parts.length > 2) {
-        val = parts[0] + '.' + parts.slice(1).join('');
-      }
-      if (parts[1] && parts[1].length > 2) {
-        val = parts[0] + '.' + parts[1].substring(0, 2);
-      }
-      this.setData({ inputPerTxTea: val });
-    } else {
-      // 固定模式：只允许正整数
-      const val = rawVal.replace(/[^\d]/g, '');
-      this.setData({ inputPerTxTea: val });
+    // 无论固定金额还是百分比模式，均允许输入最多两位小数的浮点数
+    let val = rawVal.replace(/[^\d.]/g, '');
+    const parts = val.split('.');
+    if (parts.length > 2) {
+      val = parts[0] + '.' + parts.slice(1).join('');
     }
+    if (parts[1] && parts[1].length > 2) {
+      val = parts[0] + '.' + parts[1].substring(0, 2);
+    }
+    this.setData({ inputPerTxTea: val });
   },
 
   submitTeaConfig: function () {
@@ -552,7 +566,7 @@ Page({
     const mode = this.data.inputTeaMode;
 
     // 校验输入非空时必须是合法正数
-    if (totalStr !== '' && (!/^\d+$/.test(totalStr) || parseInt(totalStr) <= 0)) {
+    if (totalStr !== '' && (!/^\d+(\.\d+)?$/.test(totalStr) || parseFloat(totalStr) <= 0)) {
       wx.showToast({ title: '总茶水钱必须是正数', icon: 'none' });
       return;
     }
@@ -561,7 +575,7 @@ Page({
       return;
     }
 
-    const total = totalStr === '' ? 0 : parseInt(totalStr);
+    const total = totalStr === '' ? 0 : parseFloat(totalStr);
     const per = perStr === '' ? 0 : parseFloat(perStr);
 
     if (mode === 0 && per > total && total > 0) {
@@ -708,9 +722,9 @@ Page({
 
   // 提交分数
   submitScore: function () {
-    const amount = parseInt(this.data.inputScore) || 0;
+    const amount = parseFloat(this.data.inputScore) || 0;
     if (amount <= 0) {
-      wx.showToast({ title: '请输入正确的正整数分值', icon: 'none' });
+      wx.showToast({ title: '请输入正确的正数分值', icon: 'none' });
       return;
     }
 

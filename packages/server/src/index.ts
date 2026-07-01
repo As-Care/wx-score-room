@@ -308,65 +308,25 @@ app.post('/api/room/create', async (c) => {
     }
 
     const forceNew = body.force_new === true;
-    if (forceNew) {
-      // 检查当前用户是否作为房主拥有一个未结算且只有一人的单人房间，如果是则直接物理删除
-      const existingSingleRoom = await c.env.DB.prepare(`
-        SELECT r.id FROM rooms r
-        WHERE r.owner_id = ?
-          AND r.status = 0
-          AND (SELECT COUNT(1) FROM room_users ru WHERE ru.room_id = r.id) <= 1
-        ORDER BY r.id DESC
-        LIMIT 1
-      `).bind(user.id).first<any>();
-
-      if (existingSingleRoom) {
-        const roomId = existingSingleRoom.id;
-        // 级联清理
-        await c.env.DB.prepare('DELETE FROM transactions WHERE room_id = ?').bind(roomId).run();
-        await c.env.DB.prepare('DELETE FROM room_users WHERE room_id = ?').bind(roomId).run();
-        await c.env.DB.prepare('DELETE FROM rooms WHERE id = ?').bind(roomId).run();
-      }
-    } else {
-      // 1. 优先检查当前用户是否加入了一个正在进行中 (status = 0) 且人数大于等于 2 人的多人房间 (不管是房主还是普通成员)
-      const existingMultiRoom = await c.env.DB.prepare(`
-        SELECT r.id, r.room_code FROM rooms r
+    if (!forceNew) {
+      // 检查当前用户是否属于任何一个进行中 (status = 0) 的房间 (无论单人房还是多人房)
+      const existingRoom = await c.env.DB.prepare(`
+        SELECT r.id, r.room_code, r.created_at,
+               CAST((strftime('%s', 'now') - strftime('%s', r.created_at)) / 60 AS INTEGER) as age_minutes
+        FROM rooms r
         JOIN room_users ru ON r.id = ru.room_id
         WHERE ru.user_id = ?
           AND r.status = 0
-          AND (SELECT COUNT(1) FROM room_users ru2 WHERE ru2.room_id = r.id) >= 2
         ORDER BY r.id DESC
         LIMIT 1
       `).bind(user.id).first<any>();
 
-      if (existingMultiRoom) {
-        return jsonOk({
-          status: 'ok',
-          id: existingMultiRoom.id,
-          room_code: existingMultiRoom.room_code
-        });
-      }
-
-      // 2. 检查当前用户是否作为房主拥有一个未结算 (status = 0) 且只有他一个人的单人房间
-      const existingSingleRoom = await c.env.DB.prepare(`
-        SELECT 
-          r.id, 
-          r.room_code, 
-          r.created_at,
-          CAST((strftime('%s', 'now') - strftime('%s', r.created_at)) / 60 AS INTEGER) as age_minutes
-        FROM rooms r
-        WHERE r.owner_id = ?
-          AND r.status = 0
-          AND (SELECT COUNT(1) FROM room_users ru WHERE ru.room_id = r.id) <= 1
-        ORDER BY r.id DESC
-        LIMIT 1
-      `).bind(user.id).first<any>();
-
-      if (existingSingleRoom) {
-        let ageMinutes = existingSingleRoom.age_minutes;
+      if (existingRoom) {
+        let ageMinutes = existingRoom.age_minutes;
         if (typeof ageMinutes !== 'number' || isNaN(ageMinutes)) {
           ageMinutes = 0;
-          if (existingSingleRoom.created_at) {
-            const createdTimeStr = existingSingleRoom.created_at.replace(' ', 'T') + 'Z';
+          if (existingRoom.created_at) {
+            const createdTimeStr = existingRoom.created_at.replace(' ', 'T') + 'Z';
             const createdAt = new Date(createdTimeStr);
             const now = new Date();
             const diffMs = now.getTime() - createdAt.getTime();
@@ -377,8 +337,8 @@ app.post('/api/room/create', async (c) => {
 
         return jsonOk({
           status: 'existing_single_room',
-          room_id: existingSingleRoom.id,
-          room_code: existingSingleRoom.room_code,
+          room_id: existingRoom.id,
+          room_code: existingRoom.room_code,
           expire_minutes: expireMinutes
         });
       }
@@ -577,6 +537,7 @@ app.post('/api/room/score', async (c) => {
           } else {
             // 固定金额模式
             teaDeducted = Math.min(room.tea_money_per_tx, remainingTea, amount);
+            teaDeducted = Math.round(teaDeducted * 100) / 100;
           }
         }
       }
@@ -873,17 +834,16 @@ app.get('/api/user/history', async (c) => {
          JOIN users u ON r.owner_id = u.id \
          WHERE ru.user_id = ? \
            AND ( \
-             (EXISTS (SELECT 1 FROM transactions t WHERE t.room_id = r.id AND t.is_undone = 0) \
-              AND (SELECT COUNT(1) FROM room_users ru3 WHERE ru3.room_id = r.id) > 1) \
+             (r.status = 0) \
              OR \
-             (r.status = 0 \
-              AND r.owner_id = ? \
-              AND (SELECT COUNT(1) FROM room_users ru3 WHERE ru3.room_id = r.id) <= 1) \
+             (r.status = 1 \
+              AND EXISTS (SELECT 1 FROM transactions t WHERE t.room_id = r.id AND t.is_undone = 0) \
+              AND (SELECT COUNT(1) FROM room_users ru3 WHERE ru3.room_id = r.id) > 1) \
            ) \
          ORDER BY r.id DESC \
          LIMIT ? OFFSET ?'
       )
-      .bind(user.id, user.id, limit, offset)
+      .bind(user.id, limit, offset)
       .all<any>();
 
     // 计算单个用户的历史空置对局剩余过期时间

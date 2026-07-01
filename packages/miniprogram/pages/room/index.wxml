@@ -213,7 +213,7 @@
       
       <van-field
         label="总茶水费"
-        type="number"
+        type="digit"
         placeholder="设置收满多少分"
         value="{{inputTotalTea}}"
         bind:change="onTotalTeaChange"
@@ -234,7 +234,7 @@
 
       <van-field
         label="{{inputTeaMode === 1 ? '扣除比例' : '每笔扣除 (分)'}}"
-        type="{{inputTeaMode === 1 ? 'digit' : 'number'}}"
+        type="digit"
         placeholder="{{inputTeaMode === 1 ? '每笔交易扣除的百分比' : '每笔带茶水交易扣除的固定分数'}}"
         value="{{inputPerTxTea}}"
         bind:change="onPerTxTeaChange"
@@ -297,7 +297,7 @@
       <!-- 分数输入：根据记分类型适配 Label 与 Placeholder -->
       <van-field
         label="{{isPureTea ? '缴纳金额' : '分值'}}"
-        type="number"
+        type="digit"
         placeholder="{{isPureTea ? '输入需要缴纳的茶水费' : '请输入大于0的分数'}}"
         value="{{inputScore}}"
         bind:change="onScoreValueChange"

@@ -137,13 +137,13 @@
     custom-style="padding-bottom: 50rpx; border-radius: 40rpx 40rpx 0 0;"
   >
     <view class="join-popup-content flex-column flex-center" style="padding: 40rpx 40rpx 10rpx 40rpx;">
-      <text class="popup-title">已有未开始房间</text>
-      <text class="popup-subtitle" style="margin-bottom: {{ existingRoomExpireMinutes > 0 ? '12rpx' : '40rpx' }}; text-align: center;">检测到您当前有一个未开始的单人房间 (房号: {{ existingRoomCode }})</text>
+      <text class="popup-title">已有进行中房间</text>
+      <text class="popup-subtitle" style="margin-bottom: {{ existingRoomExpireMinutes > 0 ? '12rpx' : '40rpx' }}; text-align: center;">检测到您当前有一个未结束的房间 (房号: {{ existingRoomCode }})</text>
       <text style="font-size: 24rpx; color: #809a96; margin-bottom: 40rpx; text-align: center;" wx:if="{{ existingRoomExpireMinutes > 0 }}">该房间将于 {{ existingRoomExpireMinutes }} 分钟后过期</text>
       
       <view class="flex-column" style="width: 100%; gap: 20rpx;">
-        <van-button custom-class="btn-green" block bindtap="useExistingRoom">继续使用旧房 ({{ existingRoomCode }})</van-button>
-        <van-button custom-class="btn-outline" block bindtap="createNewRoomForce">放弃并新建房间</van-button>
+        <van-button custom-class="btn-green" block bindtap="useExistingRoom">继续进入房间 ({{ existingRoomCode }})</van-button>
+        <van-button custom-class="btn-outline" block bindtap="createNewRoomForce">创建新房间</van-button>
         <van-button block color="#abb8c3" plain custom-style="border-color: rgba(0,0,0,0.06); color: #809a96;" bindtap="onCloseExistingRoomPopup">取消</van-button>
       </view>
     </view>
