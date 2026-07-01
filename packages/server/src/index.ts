@@ -327,7 +327,26 @@ app.post('/api/room/create', async (c) => {
         await c.env.DB.prepare('DELETE FROM rooms WHERE id = ?').bind(roomId).run();
       }
     } else {
-      // 检查当前用户是否作为房主拥有一个未结算 (status = 0) 且只有他一个人的单人房间
+      // 1. 优先检查当前用户是否加入了一个正在进行中 (status = 0) 且人数大于等于 2 人的多人房间 (不管是房主还是普通成员)
+      const existingMultiRoom = await c.env.DB.prepare(`
+        SELECT r.id, r.room_code FROM rooms r
+        JOIN room_users ru ON r.id = ru.room_id
+        WHERE ru.user_id = ?
+          AND r.status = 0
+          AND (SELECT COUNT(1) FROM room_users ru2 WHERE ru2.room_id = r.id) >= 2
+        ORDER BY r.id DESC
+        LIMIT 1
+      `).bind(user.id).first<any>();
+
+      if (existingMultiRoom) {
+        return jsonOk({
+          status: 'ok',
+          id: existingMultiRoom.id,
+          room_code: existingMultiRoom.room_code
+        });
+      }
+
+      // 2. 检查当前用户是否作为房主拥有一个未结算 (status = 0) 且只有他一个人的单人房间
       const existingSingleRoom = await c.env.DB.prepare(`
         SELECT 
           r.id, 
