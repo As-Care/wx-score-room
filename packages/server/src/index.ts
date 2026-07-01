@@ -177,7 +177,7 @@ app.post('/api/upload', async (c) => {
     });
 
     // 使用你给存储桶配置的自定义域名访问头像，享受高速 CDN 缓存并节省 Worker 额度
-    const avatarUrl = `https://score-room.ashang.cloud/${key}`;
+    const avatarUrl = `https://score-room.carelife.top/${key}`;
 
     return jsonOk({ avatarUrl });
   } catch (err: any) {
@@ -228,7 +228,7 @@ app.get('/api/room/qrcode', async (c) => {
 
     // 缓存 Key 拼装加入运行环境，彻底隔开开发、体验、正式版，防止串环境扫码错乱
     const cacheKey = `qrcodes/${roomCode}_${wechatEnv}.png`;
-    const originUrl = `https://score-room.ashang.cloud/${cacheKey}`;
+    const originUrl = `https://score-room.carelife.top/${cacheKey}`;
 
     // 1. 优先查 R2 缓存，若已有该房间码则直接返回
     const cachedObject = await c.env.AVATARS.get(cacheKey);
@@ -238,7 +238,7 @@ app.get('/api/room/qrcode', async (c) => {
 
     // 2. 降级判断：如未配小程序凭证或为本地假环境，直接返回标准普通方形微信二维码（用户手机依然可扫码入房）
     if (!appid || !secret || appid.startsWith('test') || appid === 'touristappid') {
-      const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent('https://wx-score-room.ashang.cloud?room_code=' + roomCode)}`;
+      const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent('https://wx-score-room.carelife.top?room_code=' + roomCode)}`;
       return jsonOk({ qrCodeUrl: fallbackUrl });
     }
 
@@ -284,7 +284,7 @@ app.get('/api/room/qrcode', async (c) => {
   } catch (err: any) {
     console.error('微信生成小程序码失败，执行安全降级：', err);
     // 降级兜底返回普通二维码
-    const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent('https://wx-score-room.ashang.cloud?room_code=' + roomCode)}`;
+    const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent('https://wx-score-room.carelife.top?room_code=' + roomCode)}`;
     return jsonOk({ qrCodeUrl: fallbackUrl });
   }
 });

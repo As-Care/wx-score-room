@@ -35,7 +35,7 @@ Page({
     return {
       title: '📝 打牌记账，轻松记分对账小助手',
       path: '/pages/index/index',
-      imageUrl: 'https://score-room.ashang.cloud/common/wx-score-room-logo.png'
+      imageUrl: 'https://score-room.carelife.top/common/wx-score-room-logo.png'
     };
   },
 
@@ -44,7 +44,7 @@ Page({
     return {
       title: '📝 打牌记账，轻松记分对账小助手',
       query: '',
-      imageUrl: 'https://score-room.ashang.cloud/common/wx-score-room-logo.png'
+      imageUrl: 'https://score-room.carelife.top/common/wx-score-room-logo.png'
     };
   },
 

@@ -2,7 +2,7 @@ App({
   // 全局变量配置
   globalData: {
     // 后端服务器地址，本地调试用 http://127.0.0.1:8787，部署后替换为 Cloudflare Workers 域名
-    apiUrl: 'https://wx-score-room.ashang.cloud',
+    apiUrl: 'https://wx-score-room.carelife.top',
     token: '',
     userInfo: null,
     // 状态栏和胶囊菜单信息，用于自定义导航栏的适配
