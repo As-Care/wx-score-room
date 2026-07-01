@@ -66,7 +66,7 @@
 .user-register-time {
   font-size: 24rpx;
   color: var(--text-secondary);
-  margin-top: 6rpx;
+  margin-top: 8rpx;
 }
 
 .user-total-score {
@@ -85,6 +85,7 @@
 .total-score-value {
   font-size: 38rpx;
   font-weight: bold;
+  margin-top: 10rpx;
 }
 
 .score-green {
@@ -283,12 +284,14 @@
 .outcome-label {
   font-size: 20rpx;
   color: var(--text-secondary);
-  margin-bottom: 4rpx;
+  text-align: right;
 }
 
 .outcome-score {
   font-size: 36rpx;
   font-weight: bold;
+  margin-top: 12rpx;
+  text-align: right;
 }
 
 /* 统一分数配色 */
@@ -340,4 +343,28 @@
 .status-finished {
   background-color: rgba(40, 167, 69, 0.15);
   color: #28a745;
+}
+
+/* 我自己的专属高亮样式 */
+.friend-stat-card.friend-me {
+  border: 1.5px solid rgba(11, 155, 119, 0.5) !important;
+  box-shadow: 0 6rpx 20rpx rgba(11, 155, 119, 0.18) !important;
+  background: rgba(11, 155, 119, 0.1) !important; /* 增加绿色背景深度，提升区分度 */
+}
+
+/* 头像上方浮动的小黄标 “我” */
+.me-badge {
+  position: absolute;
+  top: -12rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #ffd700;
+  color: #5c4308;
+  font-size: 16rpx;
+  font-weight: bold;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  z-index: 10;
+  box-shadow: 0 2rpx 6rpx rgba(255, 215, 0, 0.3);
+  white-space: nowrap;
 }

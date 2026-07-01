@@ -634,6 +634,19 @@ app.get('/api/room/poll', async (c) => {
       .first<any>();
     const hasViewedSettle = member ? (member.has_viewed_settle || 0) : 0;
 
+    // 异步尝试获取当前房间在线用户列表
+    let onlineUserIds: number[] = [];
+    try {
+      const id = c.env.ROOM_DO.idFromName(String(roomId));
+      const stub = c.env.ROOM_DO.get(id);
+      const doRes = await stub.fetch(new Request('http://do/online-users'));
+      if (doRes.ok) {
+        onlineUserIds = await doRes.json() as number[];
+      }
+    } catch (e) {
+      // 容错，获取失败不影响正常轮询
+    }
+
     // 核心提效：版本号对齐，直接响应 no_update
     if (room.version === localVersion) {
       return jsonOk({
@@ -641,7 +654,8 @@ app.get('/api/room/poll', async (c) => {
         room: null,
         players: null,
         transactions: null,
-        has_viewed_settle: hasViewedSettle
+        has_viewed_settle: hasViewedSettle,
+        onlineUserIds
       });
     }
 
@@ -679,7 +693,8 @@ app.get('/api/room/poll', async (c) => {
       room,
       players: players.results,
       transactions: transactions.results,
-      has_viewed_settle: hasViewedSettle
+      has_viewed_settle: hasViewedSettle,
+      onlineUserIds
     });
   } catch (err: any) {
     return jsonErr(401, err.message || '同步失败');
@@ -980,7 +995,11 @@ app.get('/api/room/ws', async (c) => {
   const id = c.env.ROOM_DO.idFromName(String(parsedRoomId));
   const stub = c.env.ROOM_DO.get(id);
 
-  return stub.fetch(c.req.raw);
+  const wsUrl = new URL(c.req.raw.url);
+  wsUrl.searchParams.set('user_id', String(user.id));
+  const newReq = new Request(wsUrl.toString(), c.req.raw);
+
+  return stub.fetch(newReq);
 });
 
 // Durable Object 房间房间网关类 (利用 WebSocket Hibernation API 节省计算时长 Duration)
@@ -991,16 +1010,66 @@ export class RoomDO implements DurableObject {
     this.state = state;
   }
 
+  // 获取在线用户列表并去重
+  getOnlineUserIds(): number[] {
+    const websockets = this.state.getWebSockets();
+    const idsSet = new Set<number>();
+    for (const ws of websockets) {
+      const tags = this.state.getTags(ws);
+      if (tags && tags.length > 0) {
+        const id = parseInt(tags[0]);
+        if (!isNaN(id)) {
+          idsSet.add(id);
+        }
+      }
+    }
+    return Array.from(idsSet);
+  }
+
+  // 广播在线状态给当前房间所有客户端
+  broadcastOnlineStatus() {
+    const onlineIds = this.getOnlineUserIds();
+    const payload = {
+      type: 'online_status',
+      onlineUserIds: onlineIds
+    };
+    const websockets = this.state.getWebSockets();
+    for (const ws of websockets) {
+      try {
+        ws.send(JSON.stringify(payload));
+      } catch (e) {
+        // 忽略
+      }
+    }
+  }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // 内部接口：触发广播
+    // 内部接口：获取在线用户 ID 列表
+    if (url.pathname === '/online-users') {
+      const onlineIds = this.getOnlineUserIds();
+      return new Response(JSON.stringify(onlineIds), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // 内部接口：触发广播 (将当前在线人员名单注入到推送的消息中，保证状态总是最新)
     if (url.pathname === '/broadcast') {
       const body = await request.text();
+      let payload: any;
+      try {
+        payload = JSON.parse(body);
+        payload.onlineUserIds = this.getOnlineUserIds();
+      } catch (e) {
+        payload = body;
+      }
+      
       const websockets = this.state.getWebSockets();
+      const sendContent = typeof payload === 'string' ? payload : JSON.stringify(payload);
       for (const ws of websockets) {
         try {
-          ws.send(body);
+          ws.send(sendContent);
         } catch (e) {
           // 忽略已断连的套接字
         }
@@ -1013,11 +1082,15 @@ export class RoomDO implements DurableObject {
       return new Response("Expected Upgrade: websocket", { status: 426 });
     }
 
+    const userId = url.searchParams.get('user_id') || '0';
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
-    // 接受并使连接“休眠”挂起，极大程度节省计算 GB-s 消耗
-    this.state.acceptWebSocket(server);
+    // 接受并使连接“休眠”挂起，极大程度节省计算 GB-s 消耗，并关联 user_id tag
+    this.state.acceptWebSocket(server, [userId]);
+
+    // 立即广播新的在线人员状态给所有玩家
+    this.broadcastOnlineStatus();
 
     return new Response(null, {
       status: 101,
@@ -1032,10 +1105,14 @@ export class RoomDO implements DurableObject {
 
   async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean): Promise<void> {
     ws.close();
+    // 离线时广播在线状态更新
+    this.broadcastOnlineStatus();
   }
 
   async webSocketError(ws: WebSocket, error: any): Promise<void> {
     ws.close();
+    // 离线时广播在线状态更新
+    this.broadcastOnlineStatus();
   }
 }
 

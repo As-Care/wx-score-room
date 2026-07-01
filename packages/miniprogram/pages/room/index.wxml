@@ -1,3 +1,16 @@
+<wxs module="helper">
+  module.exports = {
+    isOnline: function(onlineIds, userId) {
+      if (!onlineIds) return false;
+      for (var i = 0; i < onlineIds.length; i++) {
+        if ('' + onlineIds[i] === '' + userId) {
+          return true;
+        }
+      }
+      return false;
+    }
+  };
+</wxs>
 <view class="page-container room-page">
   <!-- 自定义高端导航栏 -->
   <view class="custom-navbar" style="height: {{statusBarHeight + navBarHeight}}px; padding-top: {{statusBarHeight}}px;">
@@ -85,10 +98,13 @@
             bindtap="onPlayerTap" 
             data-user="{{item}}"
           >
+            <!-- 在线状态指示小圆点 (仅在对局未结束且不是本人时展示) -->
+            <view class="status-dot {{helper.isOnline(onlineUserIds, item.user_id) ? 'online' : 'offline'}}" wx:if="{{roomInfo.status !== 1 && item.user_id !== myUserId}}"></view>
+
             <!-- 头像区域（包含挂在头像上方的“我”字标签） -->
             <view class="player-avatar-container">
               <view class="me-badge" wx:if="{{item.user_id === myUserId}}">我</view>
-              <view class="player-avatar-box flex-center">
+              <view class="player-avatar-box flex-center {{ (roomInfo.status !== 1 && item.user_id !== myUserId) ? (helper.isOnline(onlineUserIds, item.user_id) ? 'avatar-online' : 'avatar-offline') : '' }}">
                 <image class="player-avatar" src="{{item.avatar_url}}" mode="aspectFill" wx:if="{{item.avatar_url}}"></image>
                 <view class="player-avatar-text flex-center" wx:else>
                   {{item.nickname[0] || '?'}}
@@ -190,7 +206,7 @@
     round
     position="bottom"
     bind:close="onCloseTeaPopup"
-    custom-style="padding-bottom: 40rpx; border-radius: 40rpx 40rpx 0 0;"
+    custom-style="padding-bottom: {{keyboardHeight > 0 ? keyboardHeight + 'px' : '40rpx'}}; border-radius: 40rpx 40rpx 0 0; transition: padding-bottom 0.12s ease-out;"
   >
     <view class="tea-popup-content flex-column" style="padding: 40rpx;">
       <text class="popup-title" style="margin-bottom: 30rpx;">🍵 设置茶水规则</text>
@@ -202,6 +218,9 @@
         value="{{inputTotalTea}}"
         bind:change="onTotalTeaChange"
         input-align="right"
+        adjust-position="{{false}}"
+        bind:focus="onInputFocus"
+        bind:blur="onInputBlur"
       />
 
       <!-- 扣除方式选择器 -->
@@ -220,6 +239,9 @@
         value="{{inputPerTxTea}}"
         bind:change="onPerTxTeaChange"
         input-align="right"
+        adjust-position="{{false}}"
+        bind:focus="onInputFocus"
+        bind:blur="onInputBlur"
       >
         <text slot="button" wx:if="{{inputTeaMode === 1}}" style="color: #1e2a27; font-size: 28rpx; margin-left: 10rpx; font-weight: 500;">%</text>
       </van-field>
@@ -241,7 +263,7 @@
     round
     position="bottom"
     bind:close="onCloseScorePopup"
-    custom-style="padding-bottom: 40rpx; border-radius: 40rpx 40rpx 0 0;"
+    custom-style="padding-bottom: {{keyboardHeight > 0 ? keyboardHeight + 'px' : '40rpx'}}; border-radius: 40rpx 40rpx 0 0; transition: padding-bottom 0.12s ease-out;"
   >
     <view class="score-popup-content flex-column" style="padding: 40rpx;">
       <!-- 根据是给自己交茶水还是给别人记分，自适应显示标题 -->
@@ -267,7 +289,7 @@
           </view>
         </button>
 
-        <input type="nickname" class="room-nickname-input" placeholder="请输入游戏昵称" value="{{nickname}}" bindblur="onNicknameBlur" bindinput="onNicknameInput" />
+        <input type="nickname" class="room-nickname-input" placeholder="请输入游戏昵称" value="{{nickname}}" bindblur="onNicknameBlur" bindinput="onNicknameInput" adjust-position="{{false}}" bindfocus="onInputFocus" />
 
         <van-button size="small" custom-class="btn-green-save" style="margin-top: 20rpx; margin-bottom: 25rpx;" bindtap="saveProfile">保存个人信息</van-button>
       </view>
@@ -281,6 +303,9 @@
         bind:change="onScoreValueChange"
         input-align="right"
         size="large"
+        adjust-position="{{false}}"
+        bind:focus="onInputFocus"
+        bind:blur="onInputBlur"
       />
 
       <!-- 茶水开关 (仅在普通给别人记分，且没扣满时显示；纯交茶水时不显示) -->

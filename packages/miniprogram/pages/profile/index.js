@@ -8,6 +8,8 @@ Page({
     activeTab: 0, // 0: 历史对局, 1: 我的战友
     historyRooms: [],
     friendsList: [],
+    rawFriendsList: [],
+    sortAscending: false,
     wins: 0,
     losses: 0,
     winRate: 0,
@@ -92,9 +94,28 @@ Page({
       const newRooms = isRefresh ? formattedHistory : [...this.data.historyRooms, ...formattedHistory];
       const hasMoreData = formattedHistory.length === limit;
 
+      const myId = app.globalData.userInfo ? app.globalData.userInfo.id : 0;
+      const meItem = {
+        friend_id: myId,
+        nickname: (app.globalData.userInfo ? app.globalData.userInfo.nickname : '我') + ' (我)',
+        avatar_url: app.globalData.userInfo ? app.globalData.userInfo.avatar_url : '',
+        play_count: total,
+        net_score: totalScore,
+        isMe: true
+      };
+
+      const rawFriends = data.friends || [];
+      const fullList = [...rawFriends, meItem];
+
+      const sortAsc = this.data.sortAscending;
+      const sortedFriends = [...fullList].sort((a, b) => {
+        return sortAsc ? (a.net_score - b.net_score) : (b.net_score - a.net_score);
+      });
+
       this.setData({
         historyRooms: newRooms,
-        friendsList: data.friends || [],
+        friendsList: sortedFriends,
+        rawFriendsList: fullList,
         wins: wins,
         losses: losses,
         winRate: winRate,
@@ -121,9 +142,31 @@ Page({
 
   // 切换选项卡
   switchTab: function (e) {
-    const index = e.currentTarget.dataset.index;
+    const index = parseInt(e.currentTarget.dataset.index);
+    if (index === 1 && this.data.activeTab === 1) {
+      this.toggleSortOrder();
+      return;
+    }
     this.setData({
       activeTab: index
+    });
+  },
+
+  toggleSortOrder: function () {
+    const newOrder = !this.data.sortAscending;
+    this.setData({
+      sortAscending: newOrder
+    });
+    this.sortFriendsList();
+  },
+
+  sortFriendsList: function () {
+    const sortAsc = this.data.sortAscending;
+    const sorted = [...this.data.rawFriendsList].sort((a, b) => {
+      return sortAsc ? (a.net_score - b.net_score) : (b.net_score - a.net_score);
+    });
+    this.setData({
+      friendsList: sorted
     });
   },
 

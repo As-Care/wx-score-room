@@ -19,13 +19,11 @@
         </view>
         <view class="user-info flex-column flex-1">
           <text class="user-nickname">{{userInfo.nickname || '未登录'}}</text>
-          <text class="user-register-time">打牌记账亲友房专属游戏玩家</text>
+          <text class="user-register-time">打牌记账专属游戏玩家</text>
         </view>
         <view class="user-total-score flex-column align-end">
           <text class="total-score-label">历史总积分</text>
-          <text class="total-score-value {{totalScore >= 0 ? 'score-green' : 'score-red'}}">
-            {{totalScore >= 0 ? '+' : ''}}{{totalScore}}
-          </text>
+          <text class="total-score-value {{totalScore >= 0 ? 'score-green' : 'score-red'}}">{{totalScore >= 0 ? '+' : ''}}{{totalScore}}</text>
         </view>
       </view>
 
@@ -58,6 +56,7 @@
       <view class="tab-item {{activeTab === 1 ? 'active' : ''}} flex-center" bindtap="switchTab" data-index="{{1}}">
         <van-icon name="friends-o" size="16px" style="margin-right: 8rpx;" />
         <text>我的战友</text>
+        <van-icon name="down" size="12px" style="margin-left: 8rpx; transition: transform 0.2s; transform: rotate({{sortAscending ? 180 : 0}}deg);" wx:if="{{activeTab === 1}}" />
       </view>
     </view>
 
@@ -87,13 +86,11 @@
             </view>
             <!-- 右侧：分值大数字 (垂直居中对齐左侧两行文字) -->
             <view class="score-container">
-              <text class="final-score-num {{item.final_score > 0 ? 'score-positive' : (item.final_score < 0 ? 'score-negative' : 'score-zero')}}">
-                {{item.final_score > 0 ? '+' + item.final_score : item.final_score}}
-              </text>
+              <text class="final-score-num {{item.final_score > 0 ? 'score-positive' : (item.final_score < 0 ? 'score-negative' : 'score-zero')}}">{{item.final_score > 0 ? '+' + item.final_score : item.final_score}}</text>
             </view>
           </view>
           
-          <view class="history-footer justify-between align-center" style="margin-top: 24rpx; padding-top: 20rpx; border-top: 1px solid rgba(255, 255, 255, 0.03);">
+          <view class="history-footer justify-between align-center" style="padding-top: 20rpx; border-top: 1px solid rgba(255, 255, 255, 0.03);">
             <text class="tea-pool-report" wx:if="{{item.accumulated_tea_money > 0}}">🍵 本局茶水: {{item.accumulated_tea_money}} 分</text>
             <text class="tea-pool-report" wx:else>🍵 无茶水设置</text>
             <text class="play-date">{{item.created_at}}</text>
@@ -119,10 +116,13 @@
 
       <!-- 2. 战友榜列表 -->
       <view class="friends-list-view" wx:if="{{activeTab === 1}}">
-        <view class="glass-card friend-stat-card flex-row align-center" wx:for="{{friendsList}}" wx:key="friend_id">
-          <view class="friend-avatar-box flex-center">
-            <image class="friend-avatar" src="{{item.avatar_url}}" mode="aspectFill" wx:if="{{item.avatar_url}}"></image>
-            <view class="friend-avatar-text flex-center" wx:else>{{item.nickname[0] || '?'}}</view>
+        <view class="glass-card friend-stat-card flex-row align-center {{item.isMe ? 'friend-me' : ''}}" wx:for="{{friendsList}}" wx:key="friend_id">
+          <view class="avatar-container-wrap" style="position: relative; margin-right: 24rpx;">
+            <view class="friend-avatar-box flex-center" style="margin-right: 0;">
+              <image class="friend-avatar" src="{{item.avatar_url}}" mode="aspectFill" wx:if="{{item.avatar_url}}"></image>
+              <view class="friend-avatar-text flex-center" wx:else>{{item.nickname[0] || '?'}}</view>
+            </view>
+            <view class="me-badge" wx:if="{{item.isMe}}">我</view>
           </view>
 
           <view class="friend-main-info flex-1 flex-column">
@@ -132,9 +132,7 @@
 
           <view class="friend-outcome-box flex-column align-end">
             <text class="outcome-label">同场胜负累计</text>
-            <text class="outcome-score {{item.net_score > 0 ? 'score-positive' : (item.net_score < 0 ? 'score-negative' : 'score-zero')}}">
-              {{item.net_score > 0 ? '+' + item.net_score : item.net_score}} 分
-            </text>
+            <text class="outcome-score {{item.net_score > 0 ? 'score-positive' : (item.net_score < 0 ? 'score-negative' : 'score-zero')}}" decode="{{true}}">{{item.net_score > 0 ? '+' + item.net_score : item.net_score}}&nbsp;分</text>
           </view>
         </view>
 

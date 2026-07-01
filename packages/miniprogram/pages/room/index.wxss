@@ -230,6 +230,40 @@
   overflow: hidden;
   background-color: rgba(0, 0, 0, 0.02);
   border: 2px solid rgba(0, 150, 199, 0.25);
+  transition: all 0.2s ease;
+}
+
+/* 在线状态指示小圆点 */
+.status-dot {
+  position: absolute;
+  top: 10rpx;
+  left: 10rpx;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  border: 2rpx solid #ffffff;
+  z-index: 5;
+  transition: all 0.2s ease;
+}
+
+.status-dot.online {
+  background-color: #28a745;
+  box-shadow: 0 0 6rpx rgba(40, 167, 69, 0.6);
+}
+
+.status-dot.offline {
+  background-color: #abb8c3;
+}
+
+/* 在线和离线的头像边框阴影 */
+.player-avatar-box.avatar-online {
+  border-color: rgba(40, 167, 69, 0.4) !important;
+  box-shadow: 0 4rpx 10rpx rgba(40, 167, 69, 0.25) !important;
+}
+
+.player-avatar-box.avatar-offline {
+  border-color: rgba(171, 184, 195, 0.4) !important;
+  box-shadow: 0 4rpx 10rpx rgba(171, 184, 195, 0.2) !important;
 }
 
 .player-avatar {

@@ -43,7 +43,8 @@ Page({
 
     // 个人信息编辑数据
     avatarUrl: '',
-    nickname: ''
+    nickname: '',
+    onlineUserIds: []
   },
 
   socketTask: null, // 用于实时同步的 WebSocket 实例
@@ -118,7 +119,12 @@ Page({
     socketTask.onMessage((res) => {
       try {
         const data = JSON.parse(res.data);
-        if (data.type === 'update') {
+        if (data.type === 'online_status') {
+          console.log('收到在线状态变更推送:', data);
+          this.setData({
+            onlineUserIds: data.onlineUserIds || []
+          });
+        } else if (data.type === 'update') {
           console.log('收到房间实时更新推送:', data);
           // 计算茶水钱进度百分比
           let progress = 0;
@@ -155,7 +161,8 @@ Page({
             inputTotalTea: room.total_tea_money || '',
             inputPerTxTea: room.tea_money_per_tx || '',
             myUserId: myId,
-            isOwner: room.owner_id === myId
+            isOwner: room.owner_id === myId,
+            ...(data.onlineUserIds ? { onlineUserIds: data.onlineUserIds } : {})
           });
 
           // 检查结算状态
@@ -261,7 +268,8 @@ Page({
           inputPerTxTea: room.tea_money_per_tx || '',
           myUserId: myId,
           isOwner: room.owner_id === myId,
-          hasViewedSettle: res.has_viewed_settle === 1
+          hasViewedSettle: res.has_viewed_settle === 1,
+          onlineUserIds: res.onlineUserIds || []
         });
 
         // 核心检查：如果房间已结算
@@ -273,7 +281,8 @@ Page({
         }
       } else {
         this.setData({
-          hasViewedSettle: res.has_viewed_settle === 1
+          hasViewedSettle: res.has_viewed_settle === 1,
+          onlineUserIds: res.onlineUserIds || []
         });
         if (this.data.roomInfo && this.data.roomInfo.status === 1) {
           this.closeWebSocket();
@@ -475,7 +484,10 @@ Page({
   },
 
   onCloseTeaPopup: function () {
-    this.setData({ showTeaModal: false });
+    this.setData({ 
+      showTeaModal: false,
+      keyboardHeight: 0
+    });
   },
 
   onTotalTeaChange: function (e) {
@@ -632,7 +644,10 @@ Page({
   },
 
   onCloseScorePopup: function () {
-    this.setData({ showScoreModal: false });
+    this.setData({ 
+      showScoreModal: false,
+      keyboardHeight: 0
+    });
   },
 
   onScoreValueChange: function (e) {
@@ -775,7 +790,10 @@ Page({
   // 微信快捷填入昵称失去焦点回调 (最新规范)
   onNicknameBlur: function (e) {
     const nickname = e.detail.value;
-    this.setData({ nickname });
+    this.setData({ 
+      nickname,
+      keyboardHeight: 0
+    });
   },
 
   onNicknameInput: function (e) {
@@ -828,6 +846,19 @@ Page({
       wx.hideLoading();
       wx.showToast({ title: '保存失败', icon: 'none' });
       console.error('手动保存个人信息失败', err);
+    });
+  },
+
+  onInputFocus: function (e) {
+    const keyboardHeight = e.detail.height || 0;
+    this.setData({
+      keyboardHeight: keyboardHeight
+    });
+  },
+
+  onInputBlur: function () {
+    this.setData({
+      keyboardHeight: 0
     });
   },
 
