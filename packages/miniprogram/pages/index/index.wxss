@@ -205,7 +205,7 @@
 .popup-subtitle {
   font-size: 26rpx;
   color: var(--text-secondary);
-  margin-top: 10rpx;
+  margin-top: 30rpx;
   margin-bottom: 40rpx;
 }
 

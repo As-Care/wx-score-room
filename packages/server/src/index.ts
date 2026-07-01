@@ -308,7 +308,12 @@ app.post('/api/room/create', async (c) => {
     if (!forceNew) {
       // 检查当前用户是否作为房主拥有一个未结算 (status = 0) 且只有他一个人的单人房间
       const existingSingleRoom = await c.env.DB.prepare(`
-        SELECT r.id, r.room_code FROM rooms r
+        SELECT 
+          r.id, 
+          r.room_code, 
+          r.created_at,
+          CAST((strftime('%s', 'now') - strftime('%s', r.created_at)) / 60 AS INTEGER) as age_minutes
+        FROM rooms r
         WHERE r.owner_id = ?
           AND r.status = 0
           AND (SELECT COUNT(1) FROM room_users ru WHERE ru.room_id = r.id) <= 1
@@ -317,10 +322,24 @@ app.post('/api/room/create', async (c) => {
       `).bind(user.id).first<any>();
 
       if (existingSingleRoom) {
+        let ageMinutes = existingSingleRoom.age_minutes;
+        if (typeof ageMinutes !== 'number' || isNaN(ageMinutes)) {
+          ageMinutes = 0;
+          if (existingSingleRoom.created_at) {
+            const createdTimeStr = existingSingleRoom.created_at.replace(' ', 'T') + 'Z';
+            const createdAt = new Date(createdTimeStr);
+            const now = new Date();
+            const diffMs = now.getTime() - createdAt.getTime();
+            ageMinutes = Math.floor(diffMs / (1000 * 60));
+          }
+        }
+        const expireMinutes = Math.max(0, 30 - ageMinutes);
+
         return jsonOk({
           status: 'existing_single_room',
           room_id: existingSingleRoom.id,
-          room_code: existingSingleRoom.room_code
+          room_code: existingSingleRoom.room_code,
+          expire_minutes: expireMinutes
         });
       }
     }

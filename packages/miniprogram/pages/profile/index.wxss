@@ -172,6 +172,7 @@
 /* 历史卡片详情 */
 .history-card {
   margin-bottom: 24rpx;
+  margin-top: 24rpx;
   border: 1px solid rgba(0, 0, 0, 0.04);
 }
 

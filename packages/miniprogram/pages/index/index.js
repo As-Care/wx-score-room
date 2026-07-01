@@ -9,7 +9,11 @@ Page({
     showJoinModal: false,
     roomCodeInput: '',
     inputFocus: false,
-    keyboardHeight: 0
+    keyboardHeight: 0,
+    showExistingRoomModal: false,
+    existingRoomCode: '',
+    existingRoomId: '',
+    existingRoomExpireMinutes: 30
   },
 
   onLoad: function (options) {
@@ -230,28 +234,38 @@ Page({
       loadingTitle: '正在创建房间...'
     }).then(res => {
       if (res.status === 'existing_single_room') {
-        wx.showModal({
-          title: '已有未开始房间',
-          content: `检测到您有一个未开始的单人房间 (房号: ${res.room_code})，是否继续使用该房间？`,
-          confirmText: '使用旧房',
-          cancelText: '新建房间',
-          success: (modalRes) => {
-            if (modalRes.confirm) {
-              wx.navigateTo({
-                url: `/pages/room/index?room_id=${res.room_id}&room_code=${res.room_code}&is_owner=true`
-              });
-            } else if (modalRes.cancel) {
-              // 用户选择创建新房，重新调用并传参 forceNew = true
-              this.onCreateRoom(true);
-            }
-          }
+        this.setData({
+          showExistingRoomModal: true,
+          existingRoomCode: res.room_code,
+          existingRoomId: res.room_id,
+          existingRoomExpireMinutes: res.expire_minutes !== undefined ? res.expire_minutes : 30
         });
       } else {
+        this.setData({ showExistingRoomModal: false });
         wx.navigateTo({
           url: `/pages/room/index?room_id=${res.id}&room_code=${res.room_code}&is_owner=true`
         });
       }
     }).catch(() => {});
+  },
+
+  // 续用未开始的单人房
+  useExistingRoom: function () {
+    this.setData({ showExistingRoomModal: false });
+    wx.navigateTo({
+      url: `/pages/room/index?room_id=${this.data.existingRoomId}&room_code=${this.data.existingRoomCode}&is_owner=true`
+    });
+  },
+
+  // 放弃旧房，强行新建房间
+  createNewRoomForce: function () {
+    this.setData({ showExistingRoomModal: false });
+    this.onCreateRoom(true);
+  },
+
+  // 关闭已有未开始房间提示弹窗
+  onCloseExistingRoomPopup: function () {
+    this.setData({ showExistingRoomModal: false });
   },
 
   // 显示手动输入房间号弹窗
