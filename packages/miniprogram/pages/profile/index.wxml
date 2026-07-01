@@ -66,7 +66,7 @@
       
       <!-- 1. 历史对局列表 -->
       <view class="history-list-view" wx:if="{{activeTab === 0}}">
-        <view class="glass-card history-card" wx:for="{{historyRooms}}" wx:key="room_id" bindtap="goToRoom" data-room-id="{{item.room_id}}" data-room-code="{{item.room_code}}">
+        <view class="glass-card history-card" wx:for="{{historyRooms}}" wx:key="room_id" bindtap="goToRoom" data-room-id="{{item.room_id}}" data-room-code="{{item.room_code}}" data-room-status="{{item.room_status}}">
           <!-- 第一排：房间号 与 最终得分标签 -->
           <view class="card-row-top justify-between align-center">
             <view class="flex-row align-center">

@@ -64,7 +64,9 @@ Page({
     avatarUrl: '',
     nickname: '',
     onlineUserIds: [],
-    scoreFieldFocus: false
+    scoreFieldFocus: false,
+    isLoadingData: true,
+    roomStatus: 0
   },
 
   socketTask: null, // 用于实时同步的 WebSocket 实例
@@ -77,6 +79,7 @@ Page({
       roomId: parseInt(options.room_id) || 0,
       roomCode: options.room_code || '',
       isOwner: options.is_owner === 'true',
+      roomStatus: parseInt(options.status) || 0,
       qrCodeUrl: '',
       myUserId: app.globalData.userInfo ? app.globalData.userInfo.id : 0
     });
@@ -85,8 +88,10 @@ Page({
   onShow: function () {
     // 1. 页面切回前台、从后台恢复、解锁屏幕时，立即主动拉取一次最新数据，保证状态最新
     this.pollRoomData();
-    // 2. 建立 WebSocket 实时推送长连接，取代原先的每秒请求，实现真正零延迟
-    this.connectWebSocket();
+    // 2. 仅在进行中房间才建立 WebSocket 实时推送长连接，避免对已结束房间的无意义网络开销
+    if (this.data.roomStatus !== 1) {
+      this.connectWebSocket();
+    }
   },
 
   onHide: function () {
@@ -186,6 +191,8 @@ Page({
             inputPerTxTea: room.tea_money_per_tx || '',
             myUserId: myId,
             isOwner: room.owner_id === myId,
+            roomStatus: room.status,
+            isLoadingData: false, // 数据加载成功，隐藏全屏加载态
             ...(data.onlineUserIds ? { onlineUserIds: data.onlineUserIds } : {})
           });
 
@@ -297,8 +304,10 @@ Page({
           inputPerTxTea: room.tea_money_per_tx || '',
           myUserId: myId,
           isOwner: room.owner_id === myId,
+          roomStatus: room.status,
           hasViewedSettle: res.has_viewed_settle === 1,
-          onlineUserIds: res.onlineUserIds || []
+          onlineUserIds: res.onlineUserIds || [],
+          isLoadingData: false
         });
 
         // 核心检查：如果房间已结算
@@ -311,7 +320,8 @@ Page({
       } else {
         this.setData({
           hasViewedSettle: res.has_viewed_settle === 1,
-          onlineUserIds: res.onlineUserIds || []
+          onlineUserIds: res.onlineUserIds || [],
+          isLoadingData: false // 数据加载成功，隐藏全屏加载态
         });
         if (this.data.roomInfo && this.data.roomInfo.status === 1) {
           this.closeWebSocket();
@@ -322,6 +332,7 @@ Page({
       }
     }).catch(err => {
       console.error('房间数据同步失败', err);
+      this.setData({ isLoadingData: false });
     });
   },
 
@@ -393,7 +404,9 @@ Page({
         inputPerTxTea: room.tea_money_per_tx || '',
         myUserId: myId,
         isOwner: room.owner_id === myId,
-        hasViewedSettle: res.has_viewed_settle === 1
+        hasViewedSettle: res.has_viewed_settle === 1,
+        roomStatus: room.status,
+        isLoadingData: false
       });
       
       wx.showToast({ title: '分数已同步', icon: 'success', duration: 800 });
@@ -406,7 +419,7 @@ Page({
         }
       }
     }).catch(err => {
-      this.setData({ isRefreshing: false });
+      this.setData({ isRefreshing: false, isLoadingData: false });
       console.error('手动刷新分数失败', err);
     });
   },

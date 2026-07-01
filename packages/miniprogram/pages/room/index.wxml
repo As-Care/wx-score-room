@@ -382,4 +382,11 @@
       </view>
     </view>
   </van-popup>
+
+  <!-- 全屏加载层，防止页面拉取时闪烁和白屏，用户体验极佳 -->
+  <view class="full-page-loading flex-column flex-center" wx:if="{{ isLoadingData }}">
+    <van-loading size="36px" type="spinner" color="#0b9b77" vertical>
+      <text style="color: #809a96; font-size: 26rpx; margin-top: 24rpx; letter-spacing: 2rpx;">正在进入游戏房间...</text>
+    </van-loading>
+  </view>
 </view>

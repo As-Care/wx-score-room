@@ -201,8 +201,9 @@ Page({
   goToRoom: function (e) {
     const roomId = e.currentTarget.dataset.roomId;
     const roomCode = e.currentTarget.dataset.roomCode;
+    const roomStatus = e.currentTarget.dataset.roomStatus || 0;
     wx.navigateTo({
-      url: `/pages/room/index?room_id=${roomId}&room_code=${roomCode}`
+      url: `/pages/room/index?room_id=${roomId}&room_code=${roomCode}&status=${roomStatus}`
     });
   }
 });

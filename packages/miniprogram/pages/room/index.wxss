@@ -905,3 +905,17 @@
   color: #ee0a24 !important; /* 红色收入 */
   font-weight: bold;
 }
+
+.full-page-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #edf2f0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}

@@ -711,18 +711,8 @@ app.get('/api/room/poll', async (c) => {
       .first<any>();
     const hasViewedSettle = member ? (member.has_viewed_settle || 0) : 0;
 
-    // 异步尝试获取当前房间在线用户列表
-    let onlineUserIds: number[] = [];
-    try {
-      const id = c.env.ROOM_DO.idFromName(String(roomId));
-      const stub = c.env.ROOM_DO.get(id);
-      const doRes = await stub.fetch(new Request('http://do/online-users'));
-      if (doRes.ok) {
-        onlineUserIds = await doRes.json() as number[];
-      }
-    } catch (e) {
-      // 容错，获取失败不影响正常轮询
-    }
+    // 彻底移除阻塞的 DO/online-users 寻址调用，避免历史房间冷启动延迟，在线状态由 WebSocket 建立后即时推送同步
+    const onlineUserIds: number[] = [];
 
     // 核心提效：版本号对齐，直接响应 no_update
     if (room.version === localVersion) {
