@@ -344,13 +344,13 @@
 
 /* 统一分数配色 */
 .score-positive {
-  color: var(--theme-color-green);
-  text-shadow: 0 0 10rpx rgba(6, 214, 160, 0.2);
+  color: #ff6b6b;
+  text-shadow: 0 0 10rpx rgba(255, 107, 107, 0.2);
 }
 
 .score-negative {
-  color: #ff6b6b;
-  text-shadow: 0 0 10rpx rgba(255, 107, 107, 0.2);
+  color: var(--theme-color-green);
+  text-shadow: 0 0 10rpx rgba(6, 214, 160, 0.2);
 }
 
 .score-zero {

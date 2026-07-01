@@ -24,7 +24,7 @@
         <view class="user-total-score flex-column align-end">
           <text class="total-score-label">历史总积分</text>
           <text class="total-score-desc">(仅计算已结束对局)</text>
-          <text class="total-score-value {{totalScore >= 0 ? 'score-green' : 'score-red'}}">{{totalScore >= 0 ? '+' : ''}}{{totalScore}}</text>
+          <text class="total-score-value {{totalScore >= 0 ? 'score-red' : 'score-green'}}">{{totalScore >= 0 ? '+' : ''}}{{totalScore}}</text>
         </view>
       </view>
 
@@ -35,11 +35,11 @@
       <view class="user-card-bottom flex-row justify-between width-100">
         <view class="stat-item">
           <text class="stat-label">赢</text>
-          <text class="stat-value text-green">{{wins}} 局</text>
+          <text class="stat-value text-red">{{wins}} 局</text>
         </view>
         <view class="stat-item">
           <text class="stat-label">输</text>
-          <text class="stat-value text-red">{{losses}} 局</text>
+          <text class="stat-value text-green">{{losses}} 局</text>
         </view>
         <view class="stat-item">
           <text class="stat-label">胜率</text>

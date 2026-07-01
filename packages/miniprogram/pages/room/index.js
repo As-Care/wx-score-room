@@ -649,7 +649,8 @@ Page({
             loading: true,
             loadingTitle: '正在结算...'
           }).then(() => {
-            // 结算成功后，下一秒的轮询自动触发结算海报展示
+            // 立即展示结算海报，无需等待轮询或推送延迟！
+            this.showSettleReportPage(this.data.players);
           }).catch(() => {});
         }
       }
@@ -866,49 +867,54 @@ Page({
 
   // 保存个人信息并且刷新房间信息
   saveProfile: function () {
-    const nickname = this.data.nickname.trim();
-    const avatarUrl = this.data.avatarUrl;
-    
-    if (!nickname) {
-      wx.showToast({ title: '昵称不能为空', icon: 'none' });
-      return;
-    }
-    
-    wx.showLoading({ title: '保存中...', mask: true });
-    
-    app.request({
-      url: '/api/user/update',
-      method: 'POST',
-      data: {
-        nickname: nickname,
-        avatar_url: avatarUrl
-      }
-    }).then(updatedUser => {
-      wx.hideLoading();
-      app.globalData.userInfo = updatedUser;
-      wx.setStorageSync('userInfo', updatedUser);
-      wx.showToast({ title: '保存成功', icon: 'success' });
+    // 延迟 100ms 执行保存，给 input 失去焦点(bindblur)的 setData 留出充足的时间更新 Data 中的 nickname
+    setTimeout(() => {
+      const nickname = this.data.nickname ? this.data.nickname.trim() : '';
+      const avatarUrl = this.data.avatarUrl;
       
-      // 更新当前页面数据以反映新改的个人信息
-      this.setData({
-        myUserId: updatedUser.id
-      });
-
-      // 触发后端广播更新，这样其他人的屏幕也会立即看到我的新头像和昵称！
+      if (!nickname) {
+        wx.showToast({ title: '昵称不能为空', icon: 'none' });
+        return;
+      }
+      
+      wx.showLoading({ title: '保存中...', mask: true });
+      
       app.request({
-        url: '/api/room/broadcast-update',
+        url: '/api/user/update',
         method: 'POST',
         data: {
-          room_id: this.data.roomId
+          nickname: nickname,
+          avatar_url: avatarUrl
         }
-      }).catch((err) => {
-        console.error('触发修改个人信息广播失败', err);
+      }).then(updatedUser => {
+        wx.hideLoading();
+        app.globalData.userInfo = updatedUser;
+        wx.setStorageSync('userInfo', updatedUser);
+        wx.showToast({ title: '保存成功', icon: 'success' });
+        
+        // 更新当前页面数据以反映新改的个人信息，不直接修改本地 players 数组，完全走后端网络广播同步
+        this.setData({
+          myUserId: updatedUser.id,
+          nickname: updatedUser.nickname || '',
+          avatarUrl: updatedUser.avatar_url || ''
+        });
+
+        // 触发后端广播更新，这样其他人的屏幕也会立即看到我的新头像和昵称！
+        app.request({
+          url: '/api/room/broadcast-update',
+          method: 'POST',
+          data: {
+            room_id: this.data.roomId
+          }
+        }).catch((err) => {
+          console.error('触发修改个人信息广播失败', err);
+        });
+      }).catch(err => {
+        wx.hideLoading();
+        wx.showToast({ title: '保存失败', icon: 'none' });
+        console.error('手动保存个人信息失败', err);
       });
-    }).catch(err => {
-      wx.hideLoading();
-      wx.showToast({ title: '保存失败', icon: 'none' });
-      console.error('手动保存个人信息失败', err);
-    });
+    }, 100);
   },
 
   onInputFocus: function (e) {

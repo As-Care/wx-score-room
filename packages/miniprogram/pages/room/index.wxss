@@ -304,13 +304,13 @@
 }
 
 .score-positive {
-  color: var(--theme-color-green);
-  text-shadow: 0 0 10rpx rgba(11, 155, 119, 0.1);
+  color: #d90429;
+  text-shadow: 0 0 10rpx rgba(217, 4, 41, 0.1);
 }
 
 .score-negative {
-  color: #d90429;
-  text-shadow: 0 0 10rpx rgba(217, 4, 41, 0.1);
+  color: var(--theme-color-green);
+  text-shadow: 0 0 10rpx rgba(11, 155, 119, 0.1);
 }
 
 .score-zero {
@@ -897,11 +897,11 @@
 }
 
 .tx-amount-expense {
-  color: #ee0a24 !important; /* 红色支出 */
+  color: var(--theme-color-green) !important; /* 绿色支出 */
   font-weight: bold;
 }
 
 .tx-amount-income {
-  color: #0096c7 !important; /* 蓝色收入 */
+  color: #ee0a24 !important; /* 红色收入 */
   font-weight: bold;
 }

@@ -812,7 +812,12 @@ app.post('/api/room/settle', async (c) => {
       .prepare('UPDATE rooms SET status = 1, version = version + 1 WHERE id = ?')
       .bind(room_id)
       .run();
-    await broadcastRoomUpdate(room_id, c.env.DB, c.env.ROOM_DO);
+
+    if (c.executionCtx?.waitUntil) {
+      c.executionCtx.waitUntil(broadcastRoomUpdate(room_id, c.env.DB, c.env.ROOM_DO));
+    } else {
+      broadcastRoomUpdate(room_id, c.env.DB, c.env.ROOM_DO).catch((e) => console.error('广播结算通知失败', e));
+    }
 
     return jsonOk({ status: 'ok' });
   } catch (err: any) {
