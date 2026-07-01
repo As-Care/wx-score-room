@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS room_users (
     user_id INTEGER NOT NULL,
     score INTEGER DEFAULT 0,           -- 玩家在该房间内的当前积分
     joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    has_viewed_settle INTEGER DEFAULT 0, -- 是否已查看结算单 (0: 否, 1: 是)
     PRIMARY KEY (room_id, user_id),
     FOREIGN KEY (room_id) REFERENCES rooms(id),
     FOREIGN KEY (user_id) REFERENCES users(id)

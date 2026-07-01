@@ -39,6 +39,7 @@ Page({
     isRefreshing: false,
     activeBillTab: 'total',
     personalTransactions: [],
+    hasViewedSettle: false,
 
     // 个人信息编辑数据
     avatarUrl: '',
@@ -127,14 +128,27 @@ Page({
           }
 
           const myId = app.globalData.userInfo ? app.globalData.userInfo.id : 0;
-          const personalTxs = (data.transactions || []).filter(t => t.from_user_id === myId || t.to_user_id === myId);
+          
+          const formattedRoom = room ? {
+            ...room,
+            accumulated_tea_money: this.sanitizeScore(room.accumulated_tea_money)
+          } : {};
+          const formattedPlayers = (data.players || []).map(p => ({
+            ...p,
+            score: this.sanitizeScore(p.score)
+          }));
+          const formattedTransactions = (data.transactions || []).map(t => ({
+            ...t,
+            tea_deducted: this.sanitizeScore(t.tea_deducted)
+          }));
+          const personalTxs = formattedTransactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
 
           const isJustSettled = this.data.roomInfo.status === 0;
 
           this.setData({
-            roomInfo: room,
-            players: data.players || [],
-            transactions: data.transactions || [],
+            roomInfo: formattedRoom,
+            players: formattedPlayers,
+            transactions: formattedTransactions,
             personalTransactions: personalTxs,
             localVersion: room.version,
             teaProgress: progress,
@@ -144,12 +158,11 @@ Page({
             isOwner: room.owner_id === myId
           });
 
-          // 检查结算状态 (只有当房间原本处于进行中 status === 0，而新接收为已结算 status === 1 时，才判定为“刚刚结算”，此时全员弹出海报)
+          // 检查结算状态
           if (room.status === 1) {
             this.closeWebSocket();
-            this.stopPolling();
-            if (isJustSettled) {
-              this.showSettleReportPage(data.players || []);
+            if (!this.data.hasViewedSettle && !this.data.showSettleReport) {
+              this.showSettleReportPage(formattedPlayers);
             }
           }
         }
@@ -220,29 +233,52 @@ Page({
         }
 
         const myId = app.globalData.userInfo ? app.globalData.userInfo.id : 0;
-        const personalTxs = transactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
+        
+        const formattedRoom = room ? {
+          ...room,
+          accumulated_tea_money: this.sanitizeScore(room.accumulated_tea_money)
+        } : {};
+        const formattedPlayers = (players || []).map(p => ({
+          ...p,
+          score: this.sanitizeScore(p.score)
+        }));
+        const formattedTransactions = (transactions || []).map(t => ({
+          ...t,
+          tea_deducted: this.sanitizeScore(t.tea_deducted)
+        }));
+        const personalTxs = formattedTransactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
 
         const isJustSettled = this.data.roomInfo.status === 0;
 
         this.setData({
-          roomInfo: room,
-          players: players,
-          transactions: transactions,
+          roomInfo: formattedRoom,
+          players: formattedPlayers,
+          transactions: formattedTransactions,
           personalTransactions: personalTxs,
           localVersion: room.version,
           teaProgress: progress,
           inputTotalTea: room.total_tea_money || '',
           inputPerTxTea: room.tea_money_per_tx || '',
           myUserId: myId,
-          isOwner: room.owner_id === myId
+          isOwner: room.owner_id === myId,
+          hasViewedSettle: res.has_viewed_settle === 1
         });
 
-        // 核心检查：如果房间已结算，自动停止轮询并根据情况弹出结算大赢家海报
+        // 核心检查：如果房间已结算
         if (room.status === 1) {
           this.closeWebSocket();
-          this.stopPolling();
-          if (isJustSettled) {
-            this.showSettleReportPage(players);
+          if (!this.data.hasViewedSettle && !this.data.showSettleReport) {
+            this.showSettleReportPage(formattedPlayers);
+          }
+        }
+      } else {
+        this.setData({
+          hasViewedSettle: res.has_viewed_settle === 1
+        });
+        if (this.data.roomInfo && this.data.roomInfo.status === 1) {
+          this.closeWebSocket();
+          if (!this.data.hasViewedSettle && !this.data.showSettleReport) {
+            this.showSettleReportPage(this.data.players);
           }
         }
       }
@@ -286,31 +322,44 @@ Page({
       }
       
       const myId = app.globalData.userInfo ? app.globalData.userInfo.id : 0;
-      const personalTxs = transactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
+      
+      const formattedRoom = room ? {
+        ...room,
+        accumulated_tea_money: this.sanitizeScore(room.accumulated_tea_money)
+      } : {};
+      const formattedPlayers = (players || []).map(p => ({
+        ...p,
+        score: this.sanitizeScore(p.score)
+      }));
+      const formattedTransactions = (transactions || []).map(t => ({
+        ...t,
+        tea_deducted: this.sanitizeScore(t.tea_deducted)
+      }));
+      const personalTxs = formattedTransactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
       
       const isJustSettled = this.data.roomInfo.status === 0;
 
       this.setData({
-        roomInfo: room,
-        players: players,
-        transactions: transactions,
+        roomInfo: formattedRoom,
+        players: formattedPlayers,
+        transactions: formattedTransactions,
         personalTransactions: personalTxs,
         localVersion: room.version,
         teaProgress: progress,
         inputTotalTea: room.total_tea_money || '',
         inputPerTxTea: room.tea_money_per_tx || '',
         myUserId: myId,
-        isOwner: room.owner_id === myId
+        isOwner: room.owner_id === myId,
+        hasViewedSettle: res.has_viewed_settle === 1
       });
       
       wx.showToast({ title: '分数已同步', icon: 'success', duration: 800 });
       
-      // 如果房间已结算，同样做停止轮询并根据情况弹窗处理
+      // 如果房间已结算，同样处理弹窗
       if (room.status === 1) {
         this.closeWebSocket();
-        this.stopPolling();
-        if (isJustSettled) {
-          this.showSettleReportPage(players);
+        if (!this.data.hasViewedSettle && !this.data.showSettleReport) {
+          this.showSettleReportPage(formattedPlayers);
         }
       }
     }).catch(err => {
@@ -327,27 +376,51 @@ Page({
 
   // 关闭结算海报弹窗
   onCloseSettleReport: function () {
-    this.setData({ showSettleReport: false });
+    this.setData({
+      showSettleReport: false,
+      hasViewedSettle: true
+    });
+    this.reportSettleViewed();
   },
 
   // 退出房间回到首页大厅
   exitRoomToHome: function () {
+    this.setData({
+      hasViewedSettle: true
+    });
+    this.reportSettleViewed();
     wx.reLaunch({
       url: '/pages/index/index'
     });
   },
 
+  // 向服务器上报结算单已读状态
+  reportSettleViewed: function () {
+    if (!this.data.roomId) return;
+    app.request({
+      url: '/api/room/view-settle',
+      method: 'POST',
+      data: { room_id: this.data.roomId }
+    }).catch(err => {
+      console.error('上报结算单已读失败:', err);
+    });
+  },
+
   // 返回上一页
   goBack: function () {
-    wx.showModal({
-      title: '退出房间',
-      content: '退出后，你仍可通过输入房间号或扫码再次进入此房间。确认退出？',
-      success: (res) => {
-        if (res.confirm) {
-          wx.navigateBack({ delta: 1 });
+    if (this.data.roomInfo && this.data.roomInfo.status === 1) {
+      wx.navigateBack({ delta: 1 });
+    } else {
+      wx.showModal({
+        title: '退出房间',
+        content: '退出后，你仍可通过输入房间号或扫码再次进入此房间。确认退出？',
+        success: (res) => {
+          if (res.confirm) {
+            wx.navigateBack({ delta: 1 });
+          }
         }
-      }
-    });
+      });
+    }
   },
 
   // 二维码弹窗管理
@@ -536,7 +609,7 @@ Page({
       this.setData({
         selectedPlayer: clickedPlayer,
         isPureTea: true,
-        myCurrentScore: myPlayer.score || 0,
+        myCurrentScore: this.sanitizeScore(myPlayer.score) || 0,
         selectedPayerId: myId,
         inputScore: '',
         deductTeaChecked: false, // 缴纳茶水不显示扣除茶水开关
@@ -756,5 +829,14 @@ Page({
       wx.showToast({ title: '保存失败', icon: 'none' });
       console.error('手动保存个人信息失败', err);
     });
+  },
+
+  // 格式化数字，解决 JS 小数精度显示异常问题（如 -55.599999999999994 -> -55.6）
+  sanitizeScore: function (num) {
+    if (num === null || num === undefined) return 0;
+    const parsed = parseFloat(num);
+    if (isNaN(parsed)) return 0;
+    // 保留最多两位小数，并去除末尾无用的 0
+    return Math.round(parsed * 100) / 100;
   }
 });

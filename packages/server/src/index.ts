@@ -611,7 +611,7 @@ app.post('/api/room/undo', async (c) => {
 app.get('/api/room/poll', async (c) => {
   try {
     await ensureSchema(c.env.DB);
-    await authenticate(c.req.raw, c.env.DB);
+    const user = await authenticate(c.req.raw, c.env.DB);
     const roomId = parseInt(c.req.query('room_id') || '0');
     const localVersion = parseInt(c.req.query('local_version') || '0');
 
@@ -628,20 +628,31 @@ app.get('/api/room/poll', async (c) => {
       return jsonErr(404, '房间不存在');
     }
 
+    const member = await c.env.DB
+      .prepare('SELECT has_viewed_settle FROM room_users WHERE room_id = ? AND user_id = ?')
+      .bind(roomId, user.id)
+      .first<any>();
+    const hasViewedSettle = member ? (member.has_viewed_settle || 0) : 0;
+
     // 核心提效：版本号对齐，直接响应 no_update
     if (room.version === localVersion) {
       return jsonOk({
         has_update: false,
         room: null,
         players: null,
-        transactions: null
+        transactions: null,
+        has_viewed_settle: hasViewedSettle
       });
+    }
+
+    if (room) {
+      room.accumulated_tea_money = Math.round((room.accumulated_tea_money || 0) * 100) / 100;
     }
 
     // 获取完整房间数据并推送
     const players = await c.env.DB
       .prepare(
-        'SELECT ru.user_id, u.nickname, u.avatar_url, ru.score \
+        'SELECT ru.user_id, u.nickname, u.avatar_url, ROUND(ru.score, 2) as score \
          FROM room_users ru \
          JOIN users u ON ru.user_id = u.id \
          WHERE ru.room_id = ?'
@@ -653,7 +664,7 @@ app.get('/api/room/poll', async (c) => {
       .prepare(
         'SELECT t.id, t.from_user_id, u1.nickname as from_nickname, \
                 t.to_user_id, COALESCE(u2.nickname, \'茶水金库\') as to_nickname, \
-                t.amount, t.tea_deducted, t.is_undone, t.created_at \
+                t.amount, ROUND(t.tea_deducted, 2) as tea_deducted, t.is_undone, t.created_at \
          FROM transactions t \
          JOIN users u1 ON t.from_user_id = u1.id \
          LEFT JOIN users u2 ON t.to_user_id = u2.id \
@@ -667,7 +678,8 @@ app.get('/api/room/poll', async (c) => {
       has_update: true,
       room,
       players: players.results,
-      transactions: transactions.results
+      transactions: transactions.results,
+      has_viewed_settle: hasViewedSettle
     });
   } catch (err: any) {
     return jsonErr(401, err.message || '同步失败');
@@ -706,6 +718,28 @@ app.post('/api/room/settle', async (c) => {
   }
 });
 
+// 11.1 玩家确认查看结算单
+app.post('/api/room/view-settle', async (c) => {
+  try {
+    const user = await authenticate(c.req.raw, c.env.DB);
+    const body = await c.req.json();
+    const { room_id } = body;
+
+    if (!room_id) {
+      return jsonErr(400, '缺失房间ID');
+    }
+
+    await c.env.DB
+      .prepare('UPDATE room_users SET has_viewed_settle = 1 WHERE room_id = ? AND user_id = ?')
+      .bind(room_id, user.id)
+      .run();
+
+    return jsonOk({ status: 'ok' });
+  } catch (err: any) {
+    return jsonErr(401, err.message || '操作失败');
+  }
+});
+
 // 12. 个人中心战绩历史查询 (过滤没有得分/茶水的“空对局”房间，增加分页支持)
 app.get('/api/user/history', async (c) => {
   try {
@@ -718,7 +752,7 @@ app.get('/api/user/history', async (c) => {
     const history = await c.env.DB
       .prepare(
         'SELECT r.id as room_id, r.room_code, u.nickname as owner_nickname, \
-                ru.score as final_score, r.accumulated_tea_money, r.created_at, \
+                ROUND(ru.score, 2) as final_score, ROUND(r.accumulated_tea_money, 2) as accumulated_tea_money, r.created_at, \
                 r.status as room_status, \
                 (SELECT group_concat(u2.nickname, \'、\') \
                  FROM room_users ru2 \
@@ -740,7 +774,7 @@ app.get('/api/user/history', async (c) => {
       .prepare(
         'SELECT fu.user_id as friend_id, u.nickname, u.avatar_url, \
                 COUNT(DISTINCT ru.room_id) as play_count, \
-                SUM(ru.score) as net_score \
+                ROUND(SUM(fu.score), 2) as net_score \
          FROM room_users ru \
          JOIN room_users fu ON ru.room_id = fu.room_id \
          JOIN users u ON fu.user_id = u.id \
@@ -757,7 +791,7 @@ app.get('/api/user/history', async (c) => {
         'SELECT COUNT(1) as total, \
                 SUM(CASE WHEN ru.score > 0 THEN 1 ELSE 0 END) as wins, \
                 SUM(CASE WHEN ru.score < 0 THEN 1 ELSE 0 END) as losses, \
-                SUM(ru.score) as total_score \
+                ROUND(SUM(ru.score), 2) as total_score \
          FROM room_users ru \
          JOIN rooms r ON ru.room_id = r.id \
          WHERE ru.user_id = ? \
@@ -773,7 +807,7 @@ app.get('/api/user/history', async (c) => {
         total: summary?.total || 0,
         wins: summary?.wins || 0,
         losses: summary?.losses || 0,
-        total_score: summary?.total_score || 0
+        total_score: summary?.total_score ? Math.round(summary.total_score * 100) / 100 : 0
       }
     });
   } catch (err: any) {
@@ -786,6 +820,11 @@ app.get('/api/user/history', async (c) => {
 async function ensureSchema(db: D1Database) {
   try {
     await db.prepare("ALTER TABLE rooms ADD COLUMN tea_mode INTEGER DEFAULT 0").run();
+  } catch (e) {
+    // 列已存在，忽略
+  }
+  try {
+    await db.prepare("ALTER TABLE room_users ADD COLUMN has_viewed_settle INTEGER DEFAULT 0").run();
   } catch (e) {
     // 列已存在，忽略
   }
@@ -829,11 +868,12 @@ async function broadcastRoomUpdate(roomId: any, db: D1Database, roomDoNamespace:
       .first<any>();
 
     if (!room) return;
+    room.accumulated_tea_money = Math.round((room.accumulated_tea_money || 0) * 100) / 100;
 
     // 2. 获取最新成员列表
     const players = await db
       .prepare(
-        'SELECT ru.user_id, u.nickname, u.avatar_url, ru.score \
+        'SELECT ru.user_id, u.nickname, u.avatar_url, ROUND(ru.score, 2) as score \
          FROM room_users ru \
          JOIN users u ON ru.user_id = u.id \
          WHERE ru.room_id = ?'
@@ -846,7 +886,7 @@ async function broadcastRoomUpdate(roomId: any, db: D1Database, roomDoNamespace:
       .prepare(
         'SELECT t.id, t.from_user_id, u1.nickname as from_nickname, \
                 t.to_user_id, COALESCE(u2.nickname, \'茶水金库\') as to_nickname, \
-                t.amount, t.tea_deducted, t.is_undone, t.created_at \
+                t.amount, ROUND(t.tea_deducted, 2) as tea_deducted, t.is_undone, t.created_at \
          FROM transactions t \
          JOIN users u1 ON t.from_user_id = u1.id \
          LEFT JOIN users u2 ON t.to_user_id = u2.id \

@@ -135,13 +135,11 @@
             <text class="tx-time">{{item.created_at}}</text>
           </view>
           
-          <view class="tx-right-box align-center">
+          <view class="tx-right-box">
             <view class="tx-scores flex-column align-end">
               <!-- 个人账单模式：展示支出- / 收入+ 符号与特定着色 -->
               <block wx:if="{{activeBillTab === 'personal'}}">
-                <text class="tx-amount {{item.from_user_id === myUserId ? 'tx-amount-expense' : 'tx-amount-income'}}">
-                  {{item.from_user_id === myUserId ? '-' : '+'}}{{item.amount}} 分
-                </text>
+                <text class="tx-amount {{item.from_user_id === myUserId ? 'tx-amount-expense' : 'tx-amount-income'}}">{{item.from_user_id === myUserId ? '-' : '+'}}{{item.amount}} 分</text>
               </block>
               <!-- 总账单模式：按现在的规则展示（无 + / - 符号） -->
               <block wx:else>
@@ -151,7 +149,7 @@
             </view>
             <!-- 撤销按钮 (仅在非撤销状态，且房间未结算时展示，同时规定只能由收入方/收款人操作撤销) -->
             <view class="tx-undo-btn flex-center" catchtap="onUndoTap" data-tx="{{item}}" wx:if="{{item.is_undone !== 1 && roomInfo.status !== 1 && item.to_user_id === myUserId}}">
-              <van-icon name="revoke" size="16px" color="#ee0a24" />
+              <van-icon name="revoke" size="14px" color="#ee0a24" />
             </view>
           </view>
         </view>
