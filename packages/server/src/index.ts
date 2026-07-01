@@ -1010,11 +1010,15 @@ export class RoomDO implements DurableObject {
     this.state = state;
   }
 
-  // 获取在线用户列表并去重
-  getOnlineUserIds(): number[] {
+  // 获取在线用户列表并去重，可选择排除某个正在关闭的套接字
+  getOnlineUserIds(excludeSocket?: WebSocket): number[] {
     const websockets = this.state.getWebSockets();
     const idsSet = new Set<number>();
     for (const ws of websockets) {
+      // 排除已关闭/正在关闭/或指定的套接字
+      if (ws === excludeSocket || ws.readyState === 2 || ws.readyState === 3) {
+        continue;
+      }
       const tags = this.state.getTags(ws);
       if (tags && tags.length > 0) {
         const id = parseInt(tags[0]);
@@ -1026,15 +1030,18 @@ export class RoomDO implements DurableObject {
     return Array.from(idsSet);
   }
 
-  // 广播在线状态给当前房间所有客户端
-  broadcastOnlineStatus() {
-    const onlineIds = this.getOnlineUserIds();
+  // 广播在线状态给当前房间所有客户端，可选择排除某个套接字
+  broadcastOnlineStatus(excludeSocket?: WebSocket) {
+    const onlineIds = this.getOnlineUserIds(excludeSocket);
     const payload = {
       type: 'online_status',
       onlineUserIds: onlineIds
     };
     const websockets = this.state.getWebSockets();
     for (const ws of websockets) {
+      if (ws === excludeSocket || ws.readyState === 2 || ws.readyState === 3) {
+        continue;
+      }
       try {
         ws.send(JSON.stringify(payload));
       } catch (e) {
@@ -1105,14 +1112,14 @@ export class RoomDO implements DurableObject {
 
   async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean): Promise<void> {
     ws.close();
-    // 离线时广播在线状态更新
-    this.broadcastOnlineStatus();
+    // 离线时广播在线状态更新，并显式排除当前关闭的 ws
+    this.broadcastOnlineStatus(ws);
   }
 
   async webSocketError(ws: WebSocket, error: any): Promise<void> {
     ws.close();
-    // 离线时广播在线状态更新
-    this.broadcastOnlineStatus();
+    // 离线时广播在线状态更新，并显式排除当前关闭的 ws
+    this.broadcastOnlineStatus(ws);
   }
 }
 
