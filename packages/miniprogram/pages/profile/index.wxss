@@ -79,7 +79,13 @@
 .total-score-label {
   font-size: 20rpx;
   color: var(--text-secondary);
-  margin-bottom: 4rpx;
+  margin-bottom: 2rpx;
+}
+
+.total-score-desc {
+  font-size: 16rpx;
+  color: var(--text-secondary);
+  opacity: 0.85;
 }
 
 .total-score-value {
@@ -414,7 +420,7 @@
 /* 房间状态后过期的内联文字提示 */
 .expire-tip-inline {
   font-size: 20rpx;
-  color: #ff6b6b;
+  color: #809a96;
   margin-left: 14rpx;
   font-weight: bold;
 }
