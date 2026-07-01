@@ -305,7 +305,25 @@ app.post('/api/room/create', async (c) => {
     }
 
     const forceNew = body.force_new === true;
-    if (!forceNew) {
+    if (forceNew) {
+      // 检查当前用户是否作为房主拥有一个未结算且只有一人的单人房间，如果是则直接物理删除
+      const existingSingleRoom = await c.env.DB.prepare(`
+        SELECT r.id FROM rooms r
+        WHERE r.owner_id = ?
+          AND r.status = 0
+          AND (SELECT COUNT(1) FROM room_users ru WHERE ru.room_id = r.id) <= 1
+        ORDER BY r.id DESC
+        LIMIT 1
+      `).bind(user.id).first<any>();
+
+      if (existingSingleRoom) {
+        const roomId = existingSingleRoom.id;
+        // 级联清理
+        await c.env.DB.prepare('DELETE FROM transactions WHERE room_id = ?').bind(roomId).run();
+        await c.env.DB.prepare('DELETE FROM room_users WHERE room_id = ?').bind(roomId).run();
+        await c.env.DB.prepare('DELETE FROM rooms WHERE id = ?').bind(roomId).run();
+      }
+    } else {
       // 检查当前用户是否作为房主拥有一个未结算 (status = 0) 且只有他一个人的单人房间
       const existingSingleRoom = await c.env.DB.prepare(`
         SELECT 
@@ -814,12 +832,13 @@ app.get('/api/user/history', async (c) => {
     const limit = parseInt(c.req.query('limit') || '20');
     const offset = (page - 1) * limit;
 
-    // 查询参与的房间历史记录 (过滤没有有效未撤销记分流水的空对局房间，且玩家数必须大于1人，进行 LIMIT OFFSET 分页)
+    // 查询参与的房间历史记录 (过滤没有有效未撤销记分流水的空对局房间，且玩家数必须大于1人，或者是我作为房主且只有一个人的进行中单人房间，进行 LIMIT OFFSET 分页)
     const history = await c.env.DB
       .prepare(
         'SELECT r.id as room_id, r.room_code, u.nickname as owner_nickname, \
                 ROUND(ru.score, 2) as final_score, ROUND(r.accumulated_tea_money, 2) as accumulated_tea_money, r.created_at, \
                 r.status as room_status, \
+                CAST((strftime(\'%s\', \'now\') - strftime(\'%s\', r.created_at)) / 60 AS INTEGER) as age_minutes, \
                 (SELECT group_concat(u2.nickname, \'、\') \
                  FROM room_users ru2 \
                  JOIN users u2 ON ru2.user_id = u2.id \
@@ -828,15 +847,45 @@ app.get('/api/user/history', async (c) => {
          JOIN rooms r ON ru.room_id = r.id \
          JOIN users u ON r.owner_id = u.id \
          WHERE ru.user_id = ? \
-           AND EXISTS (SELECT 1 FROM transactions t WHERE t.room_id = r.id AND t.is_undone = 0) \
-           AND (SELECT COUNT(1) FROM room_users ru3 WHERE ru3.room_id = r.id) > 1 \
+           AND ( \
+             (EXISTS (SELECT 1 FROM transactions t WHERE t.room_id = r.id AND t.is_undone = 0) \
+              AND (SELECT COUNT(1) FROM room_users ru3 WHERE ru3.room_id = r.id) > 1) \
+             OR \
+             (r.status = 0 \
+              AND r.owner_id = ? \
+              AND (SELECT COUNT(1) FROM room_users ru3 WHERE ru3.room_id = r.id) <= 1) \
+           ) \
          ORDER BY r.id DESC \
          LIMIT ? OFFSET ?'
       )
-      .bind(user.id, limit, offset)
+      .bind(user.id, user.id, limit, offset)
       .all<any>();
 
-    // 共同游戏过战友聚合排名
+    // 计算单个用户的历史空置对局剩余过期时间
+    const historyWithExpire = (history.results || []).map((r: any) => {
+      let expireMinutes = null;
+      const playerCount = r.player_names ? r.player_names.split('、').length : 0;
+      if (r.room_status === 0 && playerCount <= 1) {
+        let age = r.age_minutes;
+        if (typeof age !== 'number' || isNaN(age)) {
+          age = 0;
+          if (r.created_at) {
+            const createdTimeStr = r.created_at.replace(' ', 'T') + 'Z';
+            const createdAt = new Date(createdTimeStr);
+            const now = new Date();
+            const diffMs = now.getTime() - createdAt.getTime();
+            age = Math.floor(diffMs / (1000 * 60));
+          }
+        }
+        expireMinutes = Math.max(0, 30 - age);
+      }
+      return {
+        ...r,
+        expire_minutes: expireMinutes
+      };
+    });
+
+    // 共同游戏过战友聚合排名 (也限定在 status = 1 吗？用户说“历史总积分的计算逻辑是所有已结束的对局”，战友排名和次数通常也是已结束，不过这里我们只对总积分summary做此限制)
     const friends = await c.env.DB
       .prepare(
         'SELECT fu.user_id as friend_id, u.nickname, u.avatar_url, \
@@ -852,7 +901,7 @@ app.get('/api/user/history', async (c) => {
       .bind(user.id, user.id)
       .all<any>();
 
-    // 汇总查询用户的总对局数、赢输数及总积分统计 (仅计入玩家人数大于1人的有效房间，用于全局大卡片展示，不受列表分页 LIMIT 影响)
+    // 汇总查询用户的总对局数、赢输数及总积分统计 (仅计入已结束的对局: r.status = 1)
     const summary = await c.env.DB
       .prepare(
         'SELECT COUNT(1) as total, \
@@ -862,6 +911,7 @@ app.get('/api/user/history', async (c) => {
          FROM room_users ru \
          JOIN rooms r ON ru.room_id = r.id \
          WHERE ru.user_id = ? \
+           AND r.status = 1 \
            AND EXISTS (SELECT 1 FROM transactions t WHERE t.room_id = r.id AND t.is_undone = 0) \
            AND (SELECT COUNT(1) FROM room_users ru3 WHERE ru3.room_id = r.id) > 1'
       )
@@ -869,7 +919,7 @@ app.get('/api/user/history', async (c) => {
       .first<any>();
 
     return jsonOk({
-      history: history.results,
+      history: historyWithExpire,
       friends: friends.results,
       summary: {
         total: summary?.total || 0,

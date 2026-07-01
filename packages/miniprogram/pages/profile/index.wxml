@@ -73,6 +73,7 @@
               <view class="room-status-badge {{item.room_status === 1 ? 'status-finished' : 'status-ongoing'}}">
                 {{item.room_status === 1 ? '已结束' : '进行中'}}
               </view>
+              <text class="expire-tip-inline" wx:if="{{item.expire_minutes !== null && item.expire_minutes !== undefined}}">{{item.expire_minutes}}分钟后过期</text>
             </view>
             <text class="final-score-title">最终得分</text>
           </view>
