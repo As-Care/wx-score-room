@@ -296,9 +296,14 @@ app.post('/api/room/create', async (c) => {
     const user = await authenticate(c.req.raw, c.env.DB);
     const body = await c.req.json().catch(() => ({}));
 
-    // 被动清理所有过期房间
-    await cleanupExpiredRooms(c.env.DB);
-    await autoSettleInactiveRooms(c.env.DB, c.env.ROOM_DO);
+    // 使用非阻塞的 waitUntil 执行后台清理与自动结算，极大缩短 API 响应延时
+    if (c.executionCtx?.waitUntil) {
+      c.executionCtx.waitUntil(cleanupExpiredRooms(c.env.DB));
+      c.executionCtx.waitUntil(autoSettleInactiveRooms(c.env.DB, c.env.ROOM_DO));
+    } else {
+      cleanupExpiredRooms(c.env.DB).catch((e) => console.error('被动清理过期房间失败', e));
+      autoSettleInactiveRooms(c.env.DB, c.env.ROOM_DO).catch((e) => console.error('被动自动结算失败', e));
+    }
     
     // 如果有传入头像昵称，顺便同步
     if (body.nickname) {
@@ -306,6 +311,26 @@ app.post('/api/room/create', async (c) => {
         .prepare('UPDATE users SET nickname = ?, avatar_url = ? WHERE openid = ?')
         .bind(body.nickname, body.avatar_url || null, user.openid)
         .run();
+    }
+
+    const forceNew = body.force_new === true;
+    if (forceNew) {
+      // 提前清理：如果选择强行开新房，先物理删除当前已存在的单人未开始空房间，避免占用 10 个房间的名额限制
+      const existingSingleRoom = await c.env.DB.prepare(`
+        SELECT id FROM rooms
+        WHERE owner_id = ?
+          AND status = 0
+          AND (SELECT COUNT(1) FROM room_users ru WHERE ru.room_id = rooms.id) <= 1
+        ORDER BY id DESC
+        LIMIT 1
+      `).bind(user.id).first<any>();
+
+      if (existingSingleRoom) {
+        const roomId = existingSingleRoom.id;
+        await c.env.DB.prepare('DELETE FROM transactions WHERE room_id = ?').bind(roomId).run();
+        await c.env.DB.prepare('DELETE FROM room_users WHERE room_id = ?').bind(roomId).run();
+        await c.env.DB.prepare('DELETE FROM rooms WHERE id = ?').bind(roomId).run();
+      }
     }
 
     // 检查当前用户作为房主的进行中房间数是否超过 10 个
@@ -318,7 +343,6 @@ app.post('/api/room/create', async (c) => {
       return jsonErr(400, '您当前创建的进行中房间数已达上限（最多10个）');
     }
 
-    const forceNew = body.force_new === true;
     if (!forceNew) {
       // 检查当前用户是否属于任何一个进行中 (status = 0) 的房间 (无论单人房还是多人房)
       const existingRoom = await c.env.DB.prepare(`
@@ -664,9 +688,6 @@ app.get('/api/room/poll', async (c) => {
   try {
     await ensureSchema(c.env.DB);
     const user = await authenticate(c.req.raw, c.env.DB);
-    
-    // 触发被动结算不活跃房间
-    await autoSettleInactiveRooms(c.env.DB, c.env.ROOM_DO);
 
     const roomId = parseInt(c.req.query('room_id') || '0');
     const localVersion = parseInt(c.req.query('local_version') || '0');
@@ -826,9 +847,14 @@ app.get('/api/user/history', async (c) => {
   try {
     const user = await authenticate(c.req.raw, c.env.DB);
 
-    // 触发被动清理：先自动删除超时的单人无用房间，保证数据不残留
-    await cleanupExpiredRooms(c.env.DB);
-    await autoSettleInactiveRooms(c.env.DB, c.env.ROOM_DO);
+    // 异步触发被动清理与结算，避免阻塞主线程响应速度
+    if (c.executionCtx?.waitUntil) {
+      c.executionCtx.waitUntil(cleanupExpiredRooms(c.env.DB));
+      c.executionCtx.waitUntil(autoSettleInactiveRooms(c.env.DB, c.env.ROOM_DO));
+    } else {
+      cleanupExpiredRooms(c.env.DB).catch((e) => console.error('被动清理过期房间失败', e));
+      autoSettleInactiveRooms(c.env.DB, c.env.ROOM_DO).catch((e) => console.error('被动自动结算失败', e));
+    }
 
     const page = parseInt(c.req.query('page') || '1');
     const limit = parseInt(c.req.query('limit') || '20');
@@ -999,6 +1025,13 @@ async function ensureSchema(db: D1Database) {
   } catch (e) {
     // 列已存在，忽略
   }
+  try {
+    // 建立索引优化 COUNT 和 MAX 扫表查询速度
+    await db.prepare("CREATE INDEX IF NOT EXISTS idx_rooms_owner_status ON rooms(owner_id, status)").run();
+  } catch (e) {}
+  try {
+    await db.prepare("CREATE INDEX IF NOT EXISTS idx_tx_room_undone ON transactions(room_id, is_undone)").run();
+  } catch (e) {}
 }
 
 async function dbGetOrCreateUser(db: D1Database, openid: string) {
