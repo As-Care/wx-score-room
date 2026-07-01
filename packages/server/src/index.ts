@@ -304,6 +304,27 @@ app.post('/api/room/create', async (c) => {
         .run();
     }
 
+    const forceNew = body.force_new === true;
+    if (!forceNew) {
+      // 检查当前用户是否作为房主拥有一个未结算 (status = 0) 且只有他一个人的单人房间
+      const existingSingleRoom = await c.env.DB.prepare(`
+        SELECT r.id, r.room_code FROM rooms r
+        WHERE r.owner_id = ?
+          AND r.status = 0
+          AND (SELECT COUNT(1) FROM room_users ru WHERE ru.room_id = r.id) <= 1
+        ORDER BY r.id DESC
+        LIMIT 1
+      `).bind(user.id).first<any>();
+
+      if (existingSingleRoom) {
+        return jsonOk({
+          status: 'existing_single_room',
+          room_id: existingSingleRoom.id,
+          room_code: existingSingleRoom.room_code
+        });
+      }
+    }
+
     // 随机生成 6 位不重复的房间号 (大写英文+数字，排除容易看错混淆的 0, O, 1, I)
     let roomCode = '';
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -721,6 +742,16 @@ app.post('/api/room/settle', async (c) => {
       return jsonErr(403, '只有房主才可以进行游戏结算');
     }
 
+    // 校验房间玩家数量：只有一个玩家时，就算给了茶水费了也不允许结算游戏
+    const playersCount = await c.env.DB
+      .prepare('SELECT COUNT(*) as count FROM room_users WHERE room_id = ?')
+      .bind(room_id)
+      .first<any>();
+
+    if (playersCount && playersCount.count <= 1) {
+      return jsonErr(400, '房间内仅有一名玩家，无法结算游戏');
+    }
+
     await c.env.DB
       .prepare('UPDATE rooms SET status = 1, version = version + 1 WHERE id = ?')
       .bind(room_id)
@@ -759,11 +790,12 @@ app.post('/api/room/view-settle', async (c) => {
 app.get('/api/user/history', async (c) => {
   try {
     const user = await authenticate(c.req.raw, c.env.DB);
+
     const page = parseInt(c.req.query('page') || '1');
     const limit = parseInt(c.req.query('limit') || '20');
     const offset = (page - 1) * limit;
 
-    // 查询参与的房间历史记录 (过滤没有有效未撤销记分流水的空对局房间，进行 LIMIT OFFSET 分页)
+    // 查询参与的房间历史记录 (过滤没有有效未撤销记分流水的空对局房间，且玩家数必须大于1人，进行 LIMIT OFFSET 分页)
     const history = await c.env.DB
       .prepare(
         'SELECT r.id as room_id, r.room_code, u.nickname as owner_nickname, \
@@ -778,6 +810,7 @@ app.get('/api/user/history', async (c) => {
          JOIN users u ON r.owner_id = u.id \
          WHERE ru.user_id = ? \
            AND EXISTS (SELECT 1 FROM transactions t WHERE t.room_id = r.id AND t.is_undone = 0) \
+           AND (SELECT COUNT(1) FROM room_users ru3 WHERE ru3.room_id = r.id) > 1 \
          ORDER BY r.id DESC \
          LIMIT ? OFFSET ?'
       )
@@ -800,7 +833,7 @@ app.get('/api/user/history', async (c) => {
       .bind(user.id, user.id)
       .all<any>();
 
-    // 汇总查询用户的总对局数、赢输数及总积分统计 (用于全局大卡片展示，不受列表分页 LIMIT 影响)
+    // 汇总查询用户的总对局数、赢输数及总积分统计 (仅计入玩家人数大于1人的有效房间，用于全局大卡片展示，不受列表分页 LIMIT 影响)
     const summary = await c.env.DB
       .prepare(
         'SELECT COUNT(1) as total, \
@@ -810,7 +843,8 @@ app.get('/api/user/history', async (c) => {
          FROM room_users ru \
          JOIN rooms r ON ru.room_id = r.id \
          WHERE ru.user_id = ? \
-           AND EXISTS (SELECT 1 FROM transactions t WHERE t.room_id = r.id AND t.is_undone = 0)'
+           AND EXISTS (SELECT 1 FROM transactions t WHERE t.room_id = r.id AND t.is_undone = 0) \
+           AND (SELECT COUNT(1) FROM room_users ru3 WHERE ru3.room_id = r.id) > 1'
       )
       .bind(user.id)
       .first<any>();
@@ -829,6 +863,7 @@ app.get('/api/user/history', async (c) => {
     return jsonErr(401, err.message || '未授权操作');
   }
 });
+
 
 // ==================== 数据库辅助方法 ====================
 
@@ -1123,4 +1158,35 @@ export class RoomDO implements DurableObject {
   }
 }
 
-export default app;
+export default {
+  fetch: app.fetch,
+
+  // 定时任务处理器：定期异步清理超时的单人空置房间 (超过 30 分钟)
+  async scheduled(event: any, env: any, ctx: any) {
+    ctx.waitUntil((async () => {
+      try {
+        console.log('[Cron Cleanup] 开始执行定时清理 (30分钟单人空房检测)...');
+        const abandonedRooms = await env.DB.prepare(`
+          SELECT id FROM rooms 
+          WHERE status = 0 
+            AND created_at < datetime('now', '-30 minutes')
+            AND (SELECT COUNT(1) FROM room_users ru WHERE ru.room_id = rooms.id) <= 1
+        `).all<any>();
+
+        if (abandonedRooms.results && abandonedRooms.results.length > 0) {
+          const roomIds = abandonedRooms.results.map((r: any) => r.id);
+          for (const roomId of roomIds) {
+            // 级联清理
+            await env.DB.prepare('DELETE FROM transactions WHERE room_id = ?').bind(roomId).run();
+            await env.DB.prepare('DELETE FROM room_users WHERE room_id = ?').bind(roomId).run();
+            await env.DB.prepare('DELETE FROM rooms WHERE id = ?').bind(roomId).run();
+            console.log(`[Cron Cleanup] 成功清理超时的单人无效房间 ID: ${roomId}`);
+          }
+          console.log(`[Cron Cleanup] 定时清理完毕，共清理 ${roomIds.length} 个空房间。`);
+        }
+      } catch (err) {
+        console.error('[Cron Cleanup] 自动清理出错:', err);
+      }
+    })());
+  }
+};

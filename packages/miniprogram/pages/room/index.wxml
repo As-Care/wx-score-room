@@ -306,6 +306,7 @@
         adjust-position="{{false}}"
         bind:focus="onInputFocus"
         bind:blur="onInputBlur"
+        focus="{{ scoreFieldFocus }}"
       />
 
       <!-- 茶水开关 (仅在普通给别人记分，且没扣满时显示；纯交茶水时不显示) -->

@@ -26,6 +26,24 @@ Page({
     });
   },
 
+  // 分享给好友
+  onShareAppMessage: function () {
+    return {
+      title: '📝 打牌记账，轻松记分对账小助手',
+      path: '/pages/index/index',
+      imageUrl: 'https://score-room.ashang.cloud/common/wx-score-room-logo.png'
+    };
+  },
+
+  // 分享到朋友圈
+  onShareTimeline: function () {
+    return {
+      title: '📝 打牌记账，轻松记分对账小助手',
+      query: '',
+      imageUrl: 'https://score-room.ashang.cloud/common/wx-score-room-logo.png'
+    };
+  },
+
   // 静默登录并初始化用户信息 (优先读取缓存 Token 以防开发降级时 OpenID 重新生成)
   initUserSession: function () {
     return new Promise((resolve) => {
@@ -194,7 +212,7 @@ Page({
   },
 
   // 创建房间并自动进入
-  onCreateRoom: function () {
+  onCreateRoom: function (forceNew = false) {
     if (!this.data.nickname.trim()) {
       wx.showToast({ title: '请先设置您的昵称', icon: 'none' });
       return;
@@ -205,14 +223,34 @@ Page({
       method: 'POST',
       data: {
         nickname: this.data.nickname,
-        avatar_url: this.data.avatarUrl
+        avatar_url: this.data.avatarUrl,
+        force_new: forceNew === true
       },
       loading: true,
       loadingTitle: '正在创建房间...'
-    }).then(room => {
-      wx.navigateTo({
-        url: `/pages/room/index?room_id=${room.id}&room_code=${room.room_code}&is_owner=true`
-      });
+    }).then(res => {
+      if (res.status === 'existing_single_room') {
+        wx.showModal({
+          title: '已有未开始房间',
+          content: `检测到您有一个未开始的单人房间 (房号: ${res.room_code})，是否继续使用该房间？`,
+          confirmText: '使用旧房',
+          cancelText: '新建房间',
+          success: (modalRes) => {
+            if (modalRes.confirm) {
+              wx.navigateTo({
+                url: `/pages/room/index?room_id=${res.room_id}&room_code=${res.room_code}&is_owner=true`
+              });
+            } else if (modalRes.cancel) {
+              // 用户选择创建新房，重新调用并传参 forceNew = true
+              this.onCreateRoom(true);
+            }
+          }
+        });
+      } else {
+        wx.navigateTo({
+          url: `/pages/room/index?room_id=${res.id}&room_code=${res.room_code}&is_owner=true`
+        });
+      }
     }).catch(() => {});
   },
 
@@ -225,8 +263,14 @@ Page({
     this.setData({
       showJoinModal: true,
       roomCodeInput: '',
-      inputFocus: true
+      inputFocus: false
     });
+    // 延迟等待弹出过渡完成，以保证微信内自动调起键盘成功率
+    setTimeout(() => {
+      this.setData({
+        inputFocus: true
+      });
+    }, 320);
   },
 
   onCloseJoinPopup: function () {

@@ -1,5 +1,24 @@
 const app = getApp();
 
+// 格式化 UTC 时间字符串为本地时区时间 (YYYY-MM-DD HH:mm)
+function formatLocalTime(utcString) {
+  if (!utcString) return '';
+  // 转换 "YYYY-MM-DD HH:MM:SS" 为 "YYYY-MM-DDTHH:MM:SSZ" 强制以 UTC 时区进行解析
+  const isoStr = utcString.replace(' ', 'T') + 'Z';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) {
+    const dFallback = new Date(utcString);
+    if (isNaN(dFallback.getTime())) return utcString;
+    return formatZeroPadding(dFallback);
+  }
+  return formatZeroPadding(d);
+}
+
+function formatZeroPadding(d) {
+  const pad = (n) => n < 10 ? '0' + n : n;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -44,7 +63,8 @@ Page({
     // 个人信息编辑数据
     avatarUrl: '',
     nickname: '',
-    onlineUserIds: []
+    onlineUserIds: [],
+    scoreFieldFocus: false
   },
 
   socketTask: null, // 用于实时同步的 WebSocket 实例
@@ -83,8 +103,7 @@ Page({
   onShareAppMessage: function () {
     return {
       title: `🎮 邀请你加入我的记账房: ${this.data.roomCode}，来联机对局吧！`,
-      path: `/pages/index/index?room_code=${this.data.roomCode}`,
-      imageUrl: '/images/share-card.png' // 如果没有该图片，微信会自动截屏当前页面
+      path: `/pages/index/index?room_code=${this.data.roomCode}`
     };
   },
 
@@ -145,7 +164,8 @@ Page({
           }));
           const formattedTransactions = (data.transactions || []).map(t => ({
             ...t,
-            tea_deducted: this.sanitizeScore(t.tea_deducted)
+            tea_deducted: this.sanitizeScore(t.tea_deducted),
+            created_at: formatLocalTime(t.created_at)
           }));
           const personalTxs = formattedTransactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
 
@@ -251,7 +271,8 @@ Page({
         }));
         const formattedTransactions = (transactions || []).map(t => ({
           ...t,
-          tea_deducted: this.sanitizeScore(t.tea_deducted)
+          tea_deducted: this.sanitizeScore(t.tea_deducted),
+          created_at: formatLocalTime(t.created_at)
         }));
         const personalTxs = formattedTransactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
 
@@ -342,7 +363,8 @@ Page({
       }));
       const formattedTransactions = (transactions || []).map(t => ({
         ...t,
-        tea_deducted: this.sanitizeScore(t.tea_deducted)
+        tea_deducted: this.sanitizeScore(t.tea_deducted),
+        created_at: formatLocalTime(t.created_at)
       }));
       const personalTxs = formattedTransactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
       
@@ -569,6 +591,22 @@ Page({
 
   // 房主发起结算房间并结束游戏
   confirmSettleRoom: function () {
+    // 拦截：如果房间内只有 1 名玩家，即使有茶水费也不允许结算
+    if (this.data.players.length <= 1) {
+      wx.showModal({
+        title: '结算提示',
+        content: '当前房间内只有 1 名玩家，无法生成结算单。是否直接返回游戏大厅？',
+        confirmText: '返回大厅',
+        cancelText: '留在房间',
+        success: (res) => {
+          if (res.confirm) {
+            this.exitRoomToHome();
+          }
+        }
+      });
+      return;
+    }
+
     // 拦截：如果未产生计分流水（对局没有发生过分值变化）
     if (this.data.transactions.length === 0) {
       wx.showModal({
@@ -626,6 +664,7 @@ Page({
         inputScore: '',
         deductTeaChecked: false, // 缴纳茶水不显示扣除茶水开关
         showScoreModal: true,
+        scoreFieldFocus: false, // 先置为 false
         avatarUrl: app.globalData.userInfo ? (app.globalData.userInfo.avatar_url || '') : (myPlayer.avatar_url || ''),
         nickname: app.globalData.userInfo ? (app.globalData.userInfo.nickname || '') : (myPlayer.nickname || '')
       });
@@ -638,15 +677,24 @@ Page({
         inputScore: '',
         // 如果茶水没满，默认开启扣茶水费
         deductTeaChecked: this.data.roomInfo.tea_money_per_tx > 0 && this.data.roomInfo.accumulated_tea_money < this.data.roomInfo.total_tea_money,
-        showScoreModal: true
+        showScoreModal: true,
+        scoreFieldFocus: false, // 先置为 false
       });
     }
+
+    // 延迟等待弹出过渡完成，以保证微信内自动调起键盘成功率
+    setTimeout(() => {
+      this.setData({
+        scoreFieldFocus: true
+      });
+    }, 320);
   },
 
   onCloseScorePopup: function () {
     this.setData({ 
       showScoreModal: false,
-      keyboardHeight: 0
+      keyboardHeight: 0,
+      scoreFieldFocus: false
     });
   },
 

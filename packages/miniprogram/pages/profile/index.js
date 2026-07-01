@@ -1,5 +1,24 @@
 const app = getApp();
 
+// 格式化 UTC 时间字符串为本地时区时间 (YYYY-MM-DD HH:mm)
+function formatLocalTime(utcString) {
+  if (!utcString) return '';
+  // 转换 "YYYY-MM-DD HH:MM:SS" 为 "YYYY-MM-DDTHH:MM:SSZ" 强制以 UTC 时区进行解析
+  const isoStr = utcString.replace(' ', 'T') + 'Z';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) {
+    const dFallback = new Date(utcString);
+    if (isNaN(dFallback.getTime())) return utcString;
+    return formatZeroPadding(dFallback);
+  }
+  return formatZeroPadding(d);
+}
+
+function formatZeroPadding(d) {
+  const pad = (n) => n < 10 ? '0' + n : n;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -77,8 +96,7 @@ Page({
       // 格式化时间戳
       const formattedHistory = (data.history || []).map(item => {
         if (item.created_at) {
-          const date = item.created_at.replace('T', ' ').substring(0, 16);
-          return { ...item, created_at: date };
+          return { ...item, created_at: formatLocalTime(item.created_at) };
         }
         return item;
       });
@@ -107,15 +125,21 @@ Page({
       const rawFriends = data.friends || [];
       const fullList = [...rawFriends, meItem];
 
+      // 计算绝对排行 (始终按总积分从大到小排列)
+      const rankedList = [...fullList].sort((a, b) => b.net_score - a.net_score);
+      rankedList.forEach((item, index) => {
+        item.rank = index + 1;
+      });
+
       const sortAsc = this.data.sortAscending;
-      const sortedFriends = [...fullList].sort((a, b) => {
+      const sortedFriends = [...rankedList].sort((a, b) => {
         return sortAsc ? (a.net_score - b.net_score) : (b.net_score - a.net_score);
       });
 
       this.setData({
         historyRooms: newRooms,
         friendsList: sortedFriends,
-        rawFriendsList: fullList,
+        rawFriendsList: rankedList,
         wins: wins,
         losses: losses,
         winRate: winRate,

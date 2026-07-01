@@ -117,6 +117,13 @@
       <!-- 2. 战友榜列表 -->
       <view class="friends-list-view" wx:if="{{activeTab === 1}}">
         <view class="glass-card friend-stat-card flex-row align-center {{item.isMe ? 'friend-me' : ''}}" wx:for="{{friendsList}}" wx:key="friend_id">
+          <!-- 绝对排行序号 -->
+          <view class="friend-rank-box flex-center">
+            <view class="friend-rank-num {{item.rank === 1 ? 'rank-1' : (item.rank === 2 ? 'rank-2' : (item.rank === 3 ? 'rank-3' : 'rank-other'))}}">
+              {{item.rank}}
+            </view>
+          </view>
+
           <view class="avatar-container-wrap" style="position: relative; margin-right: 24rpx;">
             <view class="friend-avatar-box flex-center" style="margin-right: 0;">
               <image class="friend-avatar" src="{{item.avatar_url}}" mode="aspectFill" wx:if="{{item.avatar_url}}"></image>

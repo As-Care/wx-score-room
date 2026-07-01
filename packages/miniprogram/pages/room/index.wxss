@@ -236,10 +236,10 @@
 /* 在线状态指示小圆点 */
 .status-dot {
   position: absolute;
-  top: 10rpx;
-  left: 10rpx;
-  width: 14rpx;
-  height: 14rpx;
+  top: 12rpx;
+  left: 12rpx;
+  width: 16rpx;
+  height: 16rpx;
   border-radius: 50%;
   border: 2rpx solid #ffffff;
   z-index: 5;
@@ -688,8 +688,6 @@
   justify-content: center;
   margin-right: 6rpx;
   line-height: 1;
-  position: relative;
-  top: 2rpx; /* 精密下偏 2rpx，完美解决 Vant 字体图标和文字基线视差问题 */
 }
 
 .refresh-text {
