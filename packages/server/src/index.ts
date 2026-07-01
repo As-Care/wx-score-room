@@ -298,6 +298,7 @@ app.post('/api/room/create', async (c) => {
 
     // 被动清理所有过期房间
     await cleanupExpiredRooms(c.env.DB);
+    await autoSettleInactiveRooms(c.env.DB, c.env.ROOM_DO);
     
     // 如果有传入头像昵称，顺便同步
     if (body.nickname) {
@@ -305,6 +306,16 @@ app.post('/api/room/create', async (c) => {
         .prepare('UPDATE users SET nickname = ?, avatar_url = ? WHERE openid = ?')
         .bind(body.nickname, body.avatar_url || null, user.openid)
         .run();
+    }
+
+    // 检查当前用户作为房主的进行中房间数是否超过 10 个
+    const ongoingRoomsCount = await c.env.DB.prepare(`
+      SELECT COUNT(1) as count FROM rooms
+      WHERE owner_id = ? AND status = 0
+    `).bind(user.id).first<any>();
+
+    if (ongoingRoomsCount && ongoingRoomsCount.count >= 10) {
+      return jsonErr(400, '您当前创建的进行中房间数已达上限（最多10个）');
     }
 
     const forceNew = body.force_new === true;
@@ -653,6 +664,10 @@ app.get('/api/room/poll', async (c) => {
   try {
     await ensureSchema(c.env.DB);
     const user = await authenticate(c.req.raw, c.env.DB);
+    
+    // 触发被动结算不活跃房间
+    await autoSettleInactiveRooms(c.env.DB, c.env.ROOM_DO);
+
     const roomId = parseInt(c.req.query('room_id') || '0');
     const localVersion = parseInt(c.req.query('local_version') || '0');
 
@@ -813,6 +828,7 @@ app.get('/api/user/history', async (c) => {
 
     // 触发被动清理：先自动删除超时的单人无用房间，保证数据不残留
     await cleanupExpiredRooms(c.env.DB);
+    await autoSettleInactiveRooms(c.env.DB, c.env.ROOM_DO);
 
     const page = parseInt(c.req.query('page') || '1');
     const limit = parseInt(c.req.query('limit') || '20');
@@ -941,6 +957,34 @@ async function cleanupExpiredRooms(db: D1Database) {
     }
   } catch (err) {
     console.error('[Passive Cleanup] 自动清理出错:', err);
+  }
+}
+
+async function autoSettleInactiveRooms(db: D1Database, roomDoNamespace?: DurableObjectNamespace) {
+  try {
+    const inactiveRooms = await db.prepare(`
+      SELECT id FROM rooms
+      WHERE status = 0
+        AND datetime(COALESCE(
+          (SELECT MAX(created_at) FROM transactions WHERE room_id = rooms.id AND is_undone = 0),
+          created_at
+        )) < datetime('now', '-1 hour')
+    `).all<any>();
+
+    if (inactiveRooms.results && inactiveRooms.results.length > 0) {
+      for (const r of inactiveRooms.results) {
+        const roomId = r.id;
+        // 将该房间的状态变更为已结算
+        await db.prepare('UPDATE rooms SET status = 1, version = version + 1 WHERE id = ?').bind(roomId).run();
+        // 广播状态变更通知所有在线客户端
+        if (roomDoNamespace) {
+          await broadcastRoomUpdate(roomId, db, roomDoNamespace);
+        }
+        console.log(`[Auto Settle] 成功自动结算了 1 小时无转账动态的房间 ID: ${roomId}`);
+      }
+    }
+  } catch (err: any) {
+    console.error('[Auto Settle] 自动结算不活跃房间出错:', err.message || err);
   }
 }
 
@@ -1238,12 +1282,13 @@ export class RoomDO implements DurableObject {
 export default {
   fetch: app.fetch,
 
-  // 定时任务处理器：定期异步清理超时的单人空置房间 (超过 30 分钟)
+  // 定时任务处理器：定期异步清理超时的单人空置房间 (超过 30 分钟) 以及自动结算超时的不活跃房间 (超过 1 小时)
   async scheduled(event: any, env: any, ctx: any) {
     ctx.waitUntil((async () => {
-      console.log('[Cron Cleanup] 开始执行定时清理 (30分钟单人空房检测)...');
+      console.log('[Cron Cleanup] 开始执行定时清理与自动结算检测...');
       await cleanupExpiredRooms(env.DB);
-      console.log('[Cron Cleanup] 定时清理完毕。');
+      await autoSettleInactiveRooms(env.DB, env.ROOM_DO);
+      console.log('[Cron Cleanup] 定时任务执行完毕。');
     })());
   }
 };
