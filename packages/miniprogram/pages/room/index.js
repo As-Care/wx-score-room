@@ -1,4 +1,5 @@
 const app = getApp();
+import * as echarts from '../../components/ec-canvas/echarts';
 
 // 格式化 UTC 时间字符串为本地时区时间 (YYYY-MM-DD HH:mm)
 function formatLocalTime(utcString) {
@@ -66,7 +67,13 @@ Page({
     onlineUserIds: [],
     scoreFieldFocus: false,
     isLoadingData: true,
-    roomStatus: 0
+    roomStatus: 0,
+    lineColors: ['#ff6b6b', '#0b9b77', '#0096c7', '#f4a261', '#9b5de5', '#ff9f1c', '#4361ee', '#7209b7'],
+    settleSchemes: [],
+    isTrendExpanded: false,
+    ec: {
+      lazyLoad: true
+    }
   },
 
   socketTask: null, // 用于实时同步的 WebSocket 实例
@@ -194,6 +201,8 @@ Page({
             roomStatus: room.status,
             isLoadingData: false, // 数据加载成功，隐藏全屏加载态
             ...(data.onlineUserIds ? { onlineUserIds: data.onlineUserIds } : {})
+          }, () => {
+            this.drawTrendChart();
           });
 
           // 检查结算状态
@@ -308,6 +317,8 @@ Page({
           hasViewedSettle: res.has_viewed_settle === 1,
           onlineUserIds: res.onlineUserIds || [],
           isLoadingData: false
+        }, () => {
+          this.drawTrendChart();
         });
 
         // 核心检查：如果房间已结算
@@ -340,13 +351,88 @@ Page({
   showSettleReportPage: function (players) {
     // 拷贝并按积分从高到低排序
     const sorted = [...players].sort((a, b) => b.score - a.score);
-    const mvp = sorted.length > 0 ? sorted[0] : null;
+    const mvp = sorted[0] && sorted[0].score > 0 ? sorted[0] : null;
+    const settleSchemes = this.calculateSettleSchemes(players);
 
     this.setData({
-      sortedPlayers: sorted,
-      mvpPlayer: mvp,
+      sortedPlayers: sorted.map(p => ({
+        ...p,
+        score: this.sanitizeScore(p.score)
+      })),
+      mvpPlayer: mvp ? {
+        ...mvp,
+        score: this.sanitizeScore(mvp.score)
+      } : null,
+      settleSchemes: settleSchemes,
       showSettleReport: true
     });
+  },
+
+  // 计算极简对账结算方案 (最小次数支付算法)
+  calculateSettleSchemes: function (players) {
+    const teaMoney = parseFloat(this.data.roomInfo.accumulated_tea_money) || 0;
+    
+    // 构造账目参与人
+    const debtors = [];
+    const creditors = [];
+
+    // 将真实玩家进行分类
+    players.forEach(p => {
+      const score = this.sanitizeScore(p.score);
+      if (score < 0) {
+        debtors.push({ name: p.nickname, amount: -score });
+      } else if (score > 0) {
+        creditors.push({ name: p.nickname, amount: score });
+      }
+    });
+
+    // 如果有茶水费，将茶水金库作为虚拟债权人加入以配平账目
+    if (teaMoney > 0) {
+      creditors.push({ name: '茶水金库', amount: teaMoney });
+    }
+
+    const paths = [];
+    
+    // 按金额从大到小排序以达到极简合并效果
+    debtors.sort((a, b) => b.amount - a.amount);
+    creditors.sort((a, b) => b.amount - a.amount);
+
+    let dIdx = 0;
+    let cIdx = 0;
+
+    const dList = debtors.map(d => ({ ...d }));
+    const cList = creditors.map(c => ({ ...c }));
+
+    while (dIdx < dList.length && cIdx < cList.length) {
+      const debtor = dList[dIdx];
+      const creditor = cList[cIdx];
+
+      if (debtor.amount < 0.01) {
+        dIdx++;
+        continue;
+      }
+      if (creditor.amount < 0.01) {
+        cIdx++;
+        continue;
+      }
+
+      const amount = Math.min(debtor.amount, creditor.amount);
+      
+      paths.push({
+        from: debtor.name,
+        to: creditor.name,
+        amount: Math.round(amount * 100) / 100
+      });
+
+      debtor.amount -= amount;
+      creditor.amount -= amount;
+
+      if (debtor.amount < 0.01) dIdx++;
+      if (creditor.amount < 0.01) cIdx++;
+    }
+
+    // 过滤掉流向“茶水金库”的路径（因为茶水费不参与玩家间的结算，仅以提醒文字存在）
+    return paths.filter(path => path.to !== '茶水金库');
   },
 
   // 手动强制同步刷新分数 (无视版本对比直接全量覆盖刷新)
@@ -407,6 +493,8 @@ Page({
         hasViewedSettle: res.has_viewed_settle === 1,
         roomStatus: room.status,
         isLoadingData: false
+      }, () => {
+        this.drawTrendChart();
       });
       
       wx.showToast({ title: '分数已同步', icon: 'success', duration: 800 });
@@ -950,5 +1038,204 @@ Page({
     if (isNaN(parsed)) return 0;
     // 保留最多两位小数，并去除末尾无用的 0
     return Math.round(parsed * 100) / 100;
+  },
+
+  // 快捷分值标签点击回调
+  onQuickScoreTap: function (e) {
+    const val = e.currentTarget.dataset.val;
+    this.setData({
+      inputScore: val
+    });
+  },
+
+  // 绘制局势走势折线图 (ECharts 2D)
+  drawTrendChart: function () {
+    if (this.data.roomStatus !== 1 || !this.data.isTrendExpanded) return;
+
+    const players = this.data.players || [];
+    if (players.length === 0) return;
+
+    wx.nextTick(() => {
+      const chartComponent = this.selectComponent('#trendChartDom');
+      if (!chartComponent) {
+        console.warn('未找到 ECharts 组件，跳过局势走势图绘制');
+        return;
+      }
+
+      if (this.chartInstance) {
+        // 实例已存在，直接热更新配置，极速渲染
+        try {
+          this.chartInstance.setOption(this.getChartOption(), true);
+        } catch (err) {
+          console.error('更新 ECharts 失败', err);
+        }
+      } else {
+        // 实例不存在，LazyLoad 初始化
+        chartComponent.init((canvas, width, height, dpr) => {
+          try {
+            const chart = echarts.init(canvas, null, {
+              width: width,
+              height: height,
+              devicePixelRatio: dpr
+            });
+            canvas.setChart(chart);
+            this.chartInstance = chart;
+            chart.setOption(this.getChartOption());
+            return chart;
+          } catch (err) {
+            console.error('初始化 ECharts 失败', err);
+          }
+        });
+      }
+    });
+  },
+
+  // 获取 ECharts 的配置项及动态系列数据
+  getChartOption: function () {
+    const players = this.data.players || [];
+    const transactions = this.data.transactions || [];
+    
+    // 过滤已撤销的交易，按时间正序排列（从早到晚）
+    const validTxs = [...transactions]
+      .filter(t => t.is_undone !== 1)
+      .reverse();
+
+    // 统计每一轮之后各玩家的分值累计变化
+    const playerHistory = {};
+    const currentScores = {};
+    players.forEach(p => {
+      playerHistory[p.user_id] = [0];
+      currentScores[p.user_id] = 0;
+    });
+
+    validTxs.forEach(tx => {
+      const amount = parseFloat(tx.amount) || 0;
+      const teaDeducted = parseFloat(tx.tea_deducted) || 0;
+
+      if (currentScores[tx.from_user_id] !== undefined) {
+        currentScores[tx.from_user_id] -= amount;
+      }
+      if (tx.to_user_id && currentScores[tx.to_user_id] !== undefined) {
+        currentScores[tx.to_user_id] += (amount - teaDeducted);
+      }
+
+      players.forEach(p => {
+        playerHistory[p.user_id].push(currentScores[p.user_id]);
+      });
+    });
+
+    const rounds = Array.from({ length: validTxs.length + 1 }, (_, i) => `R${i}`);
+
+    // 高端配色体系
+    const lineColors = this.data.lineColors;
+
+    // 组装折线系列数据，开启 smooth 使曲线自然平滑
+    const series = players.map((p, idx) => {
+      return {
+        name: p.nickname,
+        type: 'line',
+        data: playerHistory[p.user_id],
+        smooth: true,
+        showSymbol: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: {
+          width: 3,
+          color: lineColors[idx % lineColors.length]
+        },
+        itemStyle: {
+          color: lineColors[idx % lineColors.length]
+        }
+      };
+    });
+
+    return {
+      color: lineColors,
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'line',
+          lineStyle: {
+            color: '#b2c4c1',
+            width: 1,
+            type: 'dashed'
+          }
+        },
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        textStyle: {
+          color: '#596c68',
+          fontSize: 11
+        },
+        borderWidth: 0,
+        extraCssText: 'box-shadow: 0 4rpx 20rpx rgba(11, 155, 119, 0.15); border-radius: 16rpx;'
+      },
+      legend: {
+        data: players.map(p => p.nickname),
+        top: 5,
+        left: 'center',
+        itemWidth: 12,
+        itemHeight: 8,
+        textStyle: {
+          color: '#809a96',
+          fontSize: 10,
+          fontFamily: 'sans-serif'
+        }
+      },
+      grid: {
+        left: '4%',
+        right: '5%', // 还原右边距，让折线图在右侧充盈显示
+        bottom: '5%',
+        top: '22%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: rounds,
+        axisLine: {
+          lineStyle: {
+            color: '#eef3f1'
+          }
+        },
+        axisLabel: {
+          color: '#809a96',
+          fontSize: 10
+        }
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: {
+          show: false
+        },
+        axisTick: {
+          show: false
+        },
+        splitLine: {
+          lineStyle: {
+            color: '#eef3f1'
+          }
+        },
+        axisLabel: {
+          color: '#809a96',
+          fontSize: 10
+        }
+      },
+      series: series
+    };
+  },
+
+  // 手风琴折叠收起控制，并在展开时完成图表首次初始化
+  toggleTrendChart: function () {
+    const nextState = !this.data.isTrendExpanded;
+    this.setData({
+      isTrendExpanded: nextState
+    }, () => {
+      if (nextState) {
+        // 当展开动作触发时，延时 150ms 等待 CSS 高度动画进行到合适程度后，再初始化 ECharts 以防尺寸测算为 0
+        setTimeout(() => {
+          this.drawTrendChart();
+        }, 150);
+      }
+    });
   }
 });

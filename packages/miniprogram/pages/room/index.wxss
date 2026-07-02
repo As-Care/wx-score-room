@@ -919,3 +919,159 @@
   justify-content: center;
   align-items: center;
 }
+
+/* 快捷分值标签样式 */
+.quick-scores-container {
+  width: 100%;
+  padding: 0 10rpx;
+  box-sizing: border-box;
+  margin-bottom: 24rpx;
+}
+
+.quick-scores-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.quick-score-tag {
+  flex: 1;
+  margin: 0 8rpx;
+  height: 60rpx;
+  background: #f1f5f3;
+  color: #596c68;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  font-weight: 500;
+  border: 1rpx solid rgba(0, 0, 0, 0.03);
+  transition: all 0.15s ease;
+}
+
+.quick-score-tag.active {
+  background: rgba(11, 155, 119, 0.1);
+  color: #0b9b77;
+  border-color: rgba(11, 155, 119, 0.2);
+  font-weight: bold;
+}
+
+/* 极简结算方案样式 */
+.settle-scheme-box {
+  background: rgba(11, 155, 119, 0.04);
+  border: 1rpx solid rgba(11, 155, 119, 0.1);
+  border-radius: 20rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.scheme-title {
+  font-size: 26rpx;
+  font-weight: bold;
+  color: #0b9b77;
+  margin-bottom: 16rpx;
+}
+
+.scheme-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.scheme-item {
+  font-size: 24rpx;
+  color: #2c3e50;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 12rpx 20rpx;
+  border-radius: 12rpx;
+}
+
+.scheme-name {
+  max-width: 150rpx;
+  font-weight: 500;
+}
+
+.from-name {
+  color: var(--theme-color-green); /* 绿色付款人 */
+}
+
+.to-name {
+  color: #d90429; /* 红色收款人 */
+}
+
+.scheme-arrow {
+  margin: 0 16rpx;
+  color: #95a5a6;
+  font-weight: bold;
+}
+
+.scheme-amount {
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+/* 已结束房间整体高度自适应 */
+.room-page.room-page-scrollable {
+  height: auto;
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
+.room-page-scrollable .content-wrapper {
+  flex: none;
+  min-height: auto;
+}
+
+.room-page-scrollable .tx-history-card {
+  flex: none;
+  min-height: auto;
+}
+
+.room-page-scrollable .tx-list {
+  max-height: 80vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: none;
+}
+
+/* 局势走势图样式及手风琴动画 */
+.trend-chart-card {
+  padding: 30rpx !important;
+  margin-bottom: 24rpx !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.trend-chart-header {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toggle-icon {
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.toggle-icon.rotate {
+  transform: rotate(180deg);
+}
+
+.trend-chart-body-wrapper {
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: height 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.25s ease, margin-top 0.3s ease;
+  margin-top: 0;
+}
+
+.trend-chart-card.expanded .trend-chart-body-wrapper {
+  height: 520rpx; /* ECharts 容器的 520rpx 高度 */
+  opacity: 1;
+  margin-top: 25rpx;
+}
+
+#trendChartDom {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

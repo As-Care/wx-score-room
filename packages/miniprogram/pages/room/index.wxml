@@ -11,7 +11,7 @@
     }
   };
 </wxs>
-<view class="page-container room-page">
+<view class="page-container room-page {{roomStatus === 1 ? 'room-page-scrollable' : ''}}">
   <!-- 自定义高端导航栏 -->
   <view class="custom-navbar" style="height: {{statusBarHeight + navBarHeight}}px; padding-top: {{statusBarHeight}}px;">
     <view class="navbar-back flex-center" bindtap="goBack">
@@ -122,6 +122,19 @@
           </view>
         </view>
       </scroll-view>
+    </view>
+
+    <!-- 局势走势图 (仅在已结束的房间展示) -->
+    <view class="glass-card trend-chart-card {{isTrendExpanded ? 'expanded' : ''}}" wx:if="{{roomStatus === 1}}">
+      <view class="trend-chart-header" bindtap="toggleTrendChart">
+        <text class="card-section-title">📈 局势走势图</text>
+        <van-icon name="{{isTrendExpanded ? 'arrow-up' : 'arrow-down'}}" color="#809a96" size="14px" class="toggle-icon {{isTrendExpanded ? 'rotate' : ''}}" />
+      </view>
+      <view class="trend-chart-body-wrapper">
+        <view class="canvas-container" style="position: relative; width: 100%; height: 520rpx; background: rgba(255, 255, 255, 0.45); border-radius: 24rpx; box-sizing: border-box; overflow: hidden; padding: 10rpx;">
+          <ec-canvas id="trendChartDom" canvas-id="trendChartCanvas" ec="{{ ec }}"></ec-canvas>
+        </view>
+      </view>
     </view>
 
     <!-- 对账流水账 -->
@@ -294,6 +307,22 @@
         <van-button size="small" custom-class="btn-green-save" style="margin-top: 20rpx; margin-bottom: 25rpx;" bindtap="saveProfile">保存个人信息</van-button>
       </view>
 
+      <!-- 快捷分值标签 (仅在普通给别人记分时显示，两排展示8个) -->
+      <view class="quick-scores-container flex-column" wx:if="{{!isPureTea}}">
+        <view class="quick-scores-row flex-row justify-between">
+          <view class="quick-score-tag flex-center {{inputScore == '5' ? 'active' : ''}}" bindtap="onQuickScoreTap" data-val="5">5</view>
+          <view class="quick-score-tag flex-center {{inputScore == '10' ? 'active' : ''}}" bindtap="onQuickScoreTap" data-val="10">10</view>
+          <view class="quick-score-tag flex-center {{inputScore == '20' ? 'active' : ''}}" bindtap="onQuickScoreTap" data-val="20">20</view>
+          <view class="quick-score-tag flex-center {{inputScore == '40' ? 'active' : ''}}" bindtap="onQuickScoreTap" data-val="40">40</view>
+        </view>
+        <view class="quick-scores-row flex-row justify-between" style="margin-top: 16rpx;">
+          <view class="quick-score-tag flex-center {{inputScore == '80' ? 'active' : ''}}" bindtap="onQuickScoreTap" data-val="80">80</view>
+          <view class="quick-score-tag flex-center {{inputScore == '160' ? 'active' : ''}}" bindtap="onQuickScoreTap" data-val="160">160</view>
+          <view class="quick-score-tag flex-center {{inputScore == '240' ? 'active' : ''}}" bindtap="onQuickScoreTap" data-val="240">240</view>
+          <view class="quick-score-tag flex-center {{inputScore == '480' ? 'active' : ''}}" bindtap="onQuickScoreTap" data-val="480">480</view>
+        </view>
+      </view>
+
       <!-- 分数输入：根据记分类型适配 Label 与 Placeholder -->
       <van-field
         label="{{isPureTea ? '缴纳金额' : '分值'}}"
@@ -331,7 +360,6 @@
     </view>
   </van-popup>
 
-  <!-- 弹窗 4：结算大赢家海报弹窗 (提供关闭和返回大厅双按钮) -->
   <van-popup
     show="{{ showSettleReport }}"
     round
@@ -341,38 +369,59 @@
   >
     <view class="settle-popup-content flex-column flex-center">
       <view class="crown-box flex-center">👑</view>
-      <text class="settle-title">游戏结算单</text>
+      <text class="settle-title" style="margin-bottom: 20rpx;">游戏结算单</text>
       
-      <!-- MVP 荣誉位 -->
-      <view class="mvp-box flex-column flex-center" wx:if="{{mvpPlayer}}">
-        <view class="mvp-avatar-box flex-center">
-          <image class="mvp-avatar" src="{{mvpPlayer.avatar_url}}" wx:if="{{mvpPlayer.avatar_url}}"></image>
-          <view class="mvp-avatar-text flex-center" wx:else>{{mvpPlayer.nickname[0]}}</view>
-          <text class="mvp-badge">MVP</text>
-        </view>
-        <text class="mvp-name">{{mvpPlayer.nickname}}</text>
-        <text class="mvp-score {{mvpPlayer.score > 0 ? 'score-positive' : (mvpPlayer.score < 0 ? 'score-negative' : 'score-zero')}}">{{mvpPlayer.score > 0 ? '+' : ''}}{{mvpPlayer.score}} 分</text>
-      </view>
-
-      <!-- 排行榜列表 -->
-      <view class="rank-list" style="width: 100%; margin-top: 30rpx;">
-        <view class="rank-item justify-between align-center" wx:for="{{sortedPlayers}}" wx:key="user_id">
-          <view class="align-center">
-            <text class="rank-number {{index === 0 ? 'first' : (index === 1 ? 'second' : (index === 2 ? 'third' : ''))}}">{{index + 1}}</text>
-            <text class="rank-name ellipsis">{{item.nickname}}</text>
+      <!-- 滚动视图包容大赢家、排行榜和结算方案，防小屏幕溢出 -->
+      <scroll-view scroll-y="true" style="max-height: 55vh; width: 100%;">
+        <!-- MVP 荣誉位 -->
+        <view class="mvp-box flex-column flex-center" wx:if="{{mvpPlayer}}">
+          <view class="mvp-avatar-box flex-center">
+            <image class="mvp-avatar" src="{{mvpPlayer.avatar_url}}" wx:if="{{mvpPlayer.avatar_url}}"></image>
+            <view class="mvp-avatar-text flex-center" wx:else>{{mvpPlayer.nickname[0]}}</view>
+            <text class="mvp-badge">MVP</text>
           </view>
-          <text class="rank-score {{item.score > 0 ? 'score-positive' : (item.score < 0 ? 'score-negative' : 'score-zero')}}">
-            {{item.score > 0 ? '+' + item.score : item.score}} 分
-          </text>
+          <text class="mvp-name">{{mvpPlayer.nickname}}</text>
+          <text class="mvp-score {{mvpPlayer.score > 0 ? 'score-positive' : (mvpPlayer.score < 0 ? 'score-negative' : 'score-zero')}}">{{mvpPlayer.score > 0 ? '+' : ''}}{{mvpPlayer.score}} 分</text>
         </view>
-      </view>
 
-      <!-- 茶水累计最终播报 -->
-      <view class="settle-tea-summary flex-center" wx:if="{{roomInfo.accumulated_tea_money > 0}}">
-        <text>🍵 本局共收取茶水费: {{roomInfo.accumulated_tea_money}} 分</text>
-      </view>
+        <!-- 排行榜列表 -->
+        <view class="rank-list" style="width: 100%; margin-top: 30rpx;">
+          <view class="rank-item justify-between align-center" wx:for="{{sortedPlayers}}" wx:key="user_id">
+            <view class="align-center">
+              <text class="rank-number {{index === 0 ? 'first' : (index === 1 ? 'second' : (index === 2 ? 'third' : ''))}}">{{index + 1}}</text>
+              <text class="rank-name ellipsis">{{item.nickname}}</text>
+            </view>
+            <text class="rank-score {{item.score > 0 ? 'score-positive' : (item.score < 0 ? 'score-negative' : 'score-zero')}}">
+              {{item.score > 0 ? '+' + item.score : item.score}} 分
+            </text>
+          </view>
+        </view>
 
-      <view class="settle-actions flex-row justify-between" style="width: 100%; margin-top: 45rpx;">
+        <!-- 极简结算方案 -->
+        <view class="settle-scheme-box" wx:if="{{settleSchemes.length > 0}}" style="width: 100%; margin-top: 30rpx;">
+          <view class="scheme-title flex-row align-center">
+            <van-icon name="balance-list-o" color="#0b9b77" size="16px" style="margin-right: 8rpx;" />
+            <text class="scheme-title-text">极简结算方案</text>
+          </view>
+          <view class="scheme-list">
+            <view class="scheme-item flex-row align-center justify-between" wx:for="{{settleSchemes}}" wx:key="index">
+              <view class="flex-row align-center ellipsis" style="flex: 1; min-width: 0;">
+                <text class="scheme-name from-name ellipsis">{{item.from}}</text>
+                <text class="scheme-arrow">➔</text>
+                <text class="scheme-name to-name ellipsis">{{item.to}}</text>
+              </view>
+              <text class="scheme-amount">{{item.amount}} 分</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 茶水累计最终播报 -->
+        <view class="settle-tea-summary flex-center" wx:if="{{roomInfo.accumulated_tea_money > 0}}" style="margin-top: 25rpx;">
+          <text>🍵 本局共收取茶水费: {{roomInfo.accumulated_tea_money}} 分</text>
+        </view>
+      </scroll-view>
+
+      <view class="settle-actions flex-row justify-between" style="width: 100%; margin-top: 35rpx;">
         <view style="width: 48%;">
           <van-button custom-class="btn-outline" custom-style="height: 92rpx; line-height: 90rpx; font-size: 30rpx; white-space: nowrap;" block bindtap="onCloseSettleReport">关闭</van-button>
         </view>
