@@ -114,7 +114,9 @@ Page({
 
   // 微信转发/分享房间设置 (分享到聊天窗口)
   onShareAppMessage: function (options) {
-    if (options && options.from === 'button') {
+    const isSettled = this.data.roomStatus === 1 || (this.data.roomInfo && this.data.roomInfo.status === 1);
+    
+    if (isSettled) {
       // 动态获取大赢家/MVP 昵称
       const sorted = [...this.data.players].sort((a, b) => b.score - a.score);
       const mvpName = sorted[0] && sorted[0].score > 0 ? sorted[0].nickname : '';
@@ -127,6 +129,8 @@ Page({
         path: `/pages/index/index?room_code=${this.data.roomCode}`
       };
     }
+    
+    // 进行中房间的分享文案 (无论从右上角菜单还是“邀请微信好友”按钮触发)
     return {
       title: `🎮 邀请你加入我的记账房: ${this.data.roomCode}，来联机对局吧！`,
       path: `/pages/index/index?room_code=${this.data.roomCode}`
