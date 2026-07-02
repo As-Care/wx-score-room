@@ -1115,12 +1115,12 @@
   color: #596c68;
   white-space: nowrap;
   transition: all 0.2s ease-in-out;
+  font-weight: 500; /* 保持字重一致，防止字体变粗导致按钮物理宽度改变而产生左右抖动 */
 }
 
 .tag-btn.active {
   background: #0b9b77;
   border-color: #0b9b77;
   color: #ffffff;
-  font-weight: bold;
   box-shadow: 0 4rpx 12rpx rgba(11, 155, 119, 0.2);
 }
