@@ -385,7 +385,7 @@
 >
   <view class="settle-popup-content flex-column flex-center">
     <view class="crown-box flex-center">👑</view>
-    <text class="settle-title" style="margin-bottom: 20rpx;">游戏结算单</text>
+    <text class="settle-title" style="margin-bottom: 10rpx;">游戏结算单</text>
     
     <!-- 滚动视图包容大赢家、排行榜和结算方案，防小屏幕溢出 -->
     <scroll-view scroll-y="true" style="max-height: 55vh; width: 100%;">
@@ -401,26 +401,22 @@
       </view>
 
       <!-- 排行榜列表 -->
-      <view class="rank-list" style="width: 100%; margin-top: 30rpx;">
+      <view class="rank-list" style="width: 100%; margin-top: 15rpx;">
         <view class="rank-item justify-between align-center" wx:for="{{sortedPlayers}}" wx:key="user_id">
           <view class="align-center">
             <text class="rank-number {{index === 0 ? 'first' : (index === 1 ? 'second' : (index === 2 ? 'third' : ''))}}">{{index + 1}}</text>
             <text class="rank-name ellipsis">{{item.nickname}}</text>
           </view>
-          <text class="rank-score {{item.score > 0 ? 'score-positive' : (item.score < 0 ? 'score-negative' : 'score-zero')}}">
-            {{item.score > 0 ? '+' + item.score : item.score}} 分
-          </text>
+          <text class="rank-score {{item.score > 0 ? 'score-positive' : (item.score < 0 ? 'score-negative' : 'score-zero')}}">{{item.score > 0 ? '+' + item.score : item.score}} 分</text>
         </view>
       </view>
 
-      <!-- 茶水累计最终播报 -->
-      <view class="settle-tea-summary flex-center" wx:if="{{roomInfo.accumulated_tea_money > 0}}" style="margin-top: 30rpx;">
-        <text>🍵 本局共收取茶水费: {{roomInfo.accumulated_tea_money}} 分</text>
-      </view>
-
-      <!-- 茶水金库结算对象选择器 -->
+      <!-- 茶水金库结算及对象选择器 -->
       <view class="tea-recipient-selector-panel" wx:if="{{roomInfo.accumulated_tea_money > 0}}" style="width: 100%; margin-top: 30rpx;">
-        <view class="selector-title">请选择茶水金库结算对象，选择后茶水金库将转给该用户</view>
+        <view class="selector-header flex-center" style="margin-bottom: 8rpx; width: 100%;">
+          <text class="tea-summary-text" style="font-size: 26rpx; font-weight: bold; color: #0b9b77; text-align: center;">🍵 本局共收取茶水费: {{roomInfo.accumulated_tea_money}} 分</text>
+        </view>
+        <view class="selector-title">请选择茶水代收人，选中后将转入该玩家</view>
         <scroll-view class="tag-scroll-row" scroll-x="true" enhanced show-scrollbar="{{false}}">
           <view class="tag-row flex-row">
             <view class="tag-btn {{selectedTeaRecipientId === null ? 'active' : ''}}" bindtap="onSelectTeaRecipient" data-id="{{null}}">

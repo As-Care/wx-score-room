@@ -188,6 +188,7 @@ Page({
   saveProfile: function () {
     // 延迟 100ms 执行保存，给 input 失去焦点(bindblur)的 setData 留出充足的时间更新 Data 中的 nickname
     setTimeout(() => {
+      if (!this.checkSessionReady()) return;
       const nickname = this.data.nickname ? this.data.nickname.trim() : '';
       const avatarUrl = this.data.avatarUrl;
       
@@ -220,6 +221,7 @@ Page({
 
   // 创建房间并自动进入
   onCreateRoom: function (forceNew = false) {
+    if (!this.checkSessionReady()) return;
     if (!this.data.nickname.trim()) {
       wx.showToast({ title: '请先设置您的昵称', icon: 'none' });
       return;
@@ -273,6 +275,7 @@ Page({
 
   // 显示手动输入房间号弹窗
   showJoinPopup: function () {
+    if (!this.checkSessionReady()) return;
     if (!this.data.nickname.trim()) {
       wx.showToast({ title: '请先设置您的昵称', icon: 'none' });
       return;
@@ -358,6 +361,7 @@ Page({
 
   // 拉起扫码
   onScanCode: function () {
+    if (!this.checkSessionReady()) return;
     if (!this.data.nickname.trim()) {
       wx.showToast({ title: '请先设置您的昵称', icon: 'none' });
       return;
@@ -392,8 +396,18 @@ Page({
   },
 
   goToProfile: function () {
+    if (!this.checkSessionReady()) return;
     wx.navigateTo({
       url: '/pages/profile/index'
     });
+  },
+
+  // 辅助验证登录凭证是否就绪，拦截未登录时的误操作
+  checkSessionReady: function () {
+    if (!app.globalData.token) {
+      wx.showToast({ title: '正在建立连接，请稍后...', icon: 'none' });
+      return false;
+    }
+    return true;
   }
 });
