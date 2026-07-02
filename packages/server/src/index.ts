@@ -461,10 +461,12 @@ app.post('/api/room/join', async (c) => {
       .bind(room.id, user.id)
       .first();
 
+    // 核心安全策略：若房间已结算完毕（status === 1），则严格禁止新用户或非当前房间成员加入，确保对账单数据隐私安全
     if (room.status === 1 && !member) {
       return jsonErr(403, '该房间对局已结算结束');
     }
 
+    // 若当前用户尚未在房中（且非结束房间），则将其作为新成员加入并更新版本号
     if (!member) {
       // D1 Batch: 插入玩家，递增版本号
       await c.env.DB.batch([
