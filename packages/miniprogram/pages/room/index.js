@@ -70,6 +70,7 @@ Page({
     roomStatus: 0,
     lineColors: ['#ff6b6b', '#0b9b77', '#0096c7', '#f4a261', '#9b5de5', '#ff9f1c', '#4361ee', '#7209b7'],
     settleSchemes: [],
+    selectedTeaRecipientId: null, // 茶水费结算对象，默认为 null（不结算）
     isTrendExpanded: false,
     ec: {
       lazyLoad: true
@@ -205,7 +206,6 @@ Page({
             this.drawTrendChart();
           });
 
-          // 检查结算状态
           if (room.status === 1) {
             this.closeWebSocket();
             if (!this.data.hasViewedSettle && !this.data.showSettleReport) {
@@ -368,27 +368,39 @@ Page({
     });
   },
 
-  // 计算极简对账结算方案 (最小次数支付算法)
+  // 计算极简对账结算方案 (最小次数支付算法 - 采用整数运算规避精度误差)
   calculateSettleSchemes: function (players) {
     const teaMoney = parseFloat(this.data.roomInfo.accumulated_tea_money) || 0;
+    // 放大 100 倍为整数运算，彻底规避 JS 浮点数精度问题 (例如 0.03 - 0.02 != 0.01)
+    const teaMoneyInt = Math.round(teaMoney * 100);
     
     // 构造账目参与人
     const debtors = [];
     const creditors = [];
 
-    // 将真实玩家进行分类
+    // 获取当前选中的茶水收取人 ID
+    const recipientId = this.data.selectedTeaRecipientId;
+
+    // 将真实玩家进行分类并转换为整数
     players.forEach(p => {
       const score = this.sanitizeScore(p.score);
-      if (score < 0) {
-        debtors.push({ name: p.nickname, amount: -score });
-      } else if (score > 0) {
-        creditors.push({ name: p.nickname, amount: score });
+      let scoreInt = Math.round(score * 100);
+      
+      // 如果当前玩家被选为茶水接收者，将其积分加上茶水费以配平总账
+      if (recipientId !== null && p.user_id === recipientId) {
+        scoreInt += teaMoneyInt;
+      }
+
+      if (scoreInt < 0) {
+        debtors.push({ name: p.nickname, amount: -scoreInt });
+      } else if (scoreInt > 0) {
+        creditors.push({ name: p.nickname, amount: scoreInt });
       }
     });
 
-    // 如果有茶水费，将茶水金库作为虚拟债权人加入以配平账目
-    if (teaMoney > 0) {
-      creditors.push({ name: '茶水金库', amount: teaMoney });
+    // 如果未选择茶水收取人，且有茶水费，将茶水金库作为虚拟债权人加入以配平账目
+    if (recipientId === null && teaMoneyInt > 0) {
+      creditors.push({ name: '茶水金库', amount: teaMoneyInt });
     }
 
     const paths = [];
@@ -407,11 +419,11 @@ Page({
       const debtor = dList[dIdx];
       const creditor = cList[cIdx];
 
-      if (debtor.amount < 0.01) {
+      if (debtor.amount <= 0) {
         dIdx++;
         continue;
       }
-      if (creditor.amount < 0.01) {
+      if (creditor.amount <= 0) {
         cIdx++;
         continue;
       }
@@ -421,14 +433,14 @@ Page({
       paths.push({
         from: debtor.name,
         to: creditor.name,
-        amount: Math.round(amount * 100) / 100
+        amount: amount / 100 // 最终输出时再还原回浮点数，保持分值可读性
       });
 
       debtor.amount -= amount;
       creditor.amount -= amount;
 
-      if (debtor.amount < 0.01) dIdx++;
-      if (creditor.amount < 0.01) cIdx++;
+      if (debtor.amount <= 0) dIdx++;
+      if (creditor.amount <= 0) cIdx++;
     }
 
     // 过滤掉流向“茶水金库”的路径（因为茶水费不参与玩家间的结算，仅以提醒文字存在）
@@ -522,7 +534,8 @@ Page({
   onCloseSettleReport: function () {
     this.setData({
       showSettleReport: false,
-      hasViewedSettle: true
+      hasViewedSettle: true,
+      selectedTeaRecipientId: null // 关闭时重置选择器为默认不结算
     });
     this.reportSettleViewed();
   },
@@ -530,7 +543,8 @@ Page({
   // 退出房间回到首页大厅
   exitRoomToHome: function () {
     this.setData({
-      hasViewedSettle: true
+      hasViewedSettle: true,
+      selectedTeaRecipientId: null // 退出时重置选择器
     });
     this.reportSettleViewed();
     wx.reLaunch({
@@ -1236,6 +1250,25 @@ Page({
           this.drawTrendChart();
         }, 150);
       }
+    });
+  },
+
+  // 主动触发打开结算单弹窗
+  onOpenSettleReport: function () {
+    this.showSettleReportPage(this.data.players);
+  },
+
+  // 茶水金库结算对象选中事件
+  onSelectTeaRecipient: function (e) {
+    const id = e.currentTarget.dataset.id;
+    this.setData({
+      selectedTeaRecipientId: id
+    }, () => {
+      // 重新计算结算方案以在 UI 中实时呈现更新
+      const settleSchemes = this.calculateSettleSchemes(this.data.players);
+      this.setData({
+        settleSchemes: settleSchemes
+      });
     });
   }
 });

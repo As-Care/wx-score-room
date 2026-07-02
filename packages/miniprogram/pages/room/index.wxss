@@ -520,19 +520,20 @@
 }
 
 .mvp-box {
-  margin-top: 30rpx;
+  margin: 20rpx auto 0 auto;
   position: relative;
   background: rgba(11, 155, 119, 0.03);
   border: 1px solid rgba(11, 155, 119, 0.15);
   border-radius: 30rpx;
-  padding: 30rpx;
-  width: 70%;
+  padding: 20rpx;
+  width: 54%;
   box-shadow: 0 8rpx 30rpx rgba(11, 155, 119, 0.05);
+  box-sizing: border-box;
 }
 
 .mvp-avatar-box {
-  width: 130rpx;
-  height: 130rpx;
+  width: 104rpx;
+  height: 104rpx;
   border-radius: 50%;
   border: 4rpx solid #ffd700;
   box-shadow: 0 0 25rpx rgba(255, 215, 0, 0.2);
@@ -551,35 +552,35 @@
   border-radius: 50%;
   background: linear-gradient(135deg, #fdf6d0 0%, #ffd700 100%);
   color: #5c4308;
-  font-size: 40rpx;
+  font-size: 32rpx;
   font-weight: bold;
 }
 
 .mvp-badge {
   position: absolute;
-  bottom: -10rpx;
+  bottom: -8rpx;
   left: 50%;
   transform: translateX(-50%);
   background-color: #ffd700;
   color: #5c4308;
-  font-size: 18rpx;
+  font-size: 16rpx;
   font-weight: bold;
-  padding: 4rpx 12rpx;
+  padding: 2rpx 10rpx;
   border-radius: 20rpx;
   white-space: nowrap;
 }
 
 .mvp-name {
-  font-size: 30rpx;
+  font-size: 26rpx;
   font-weight: bold;
   color: #1e2a27;
-  margin-top: 24rpx;
+  margin-top: 14rpx;
 }
 
 .mvp-score {
-  font-size: 34rpx;
+  font-size: 30rpx;
   font-weight: bold;
-  margin-top: 6rpx;
+  margin-top: 4rpx;
 }
 
 /* 排行榜单项 */
@@ -1074,4 +1075,51 @@
   width: 100%;
   height: 100%;
   display: block;
+}
+
+/* 茶水金库结算对象选择面板 */
+.tea-recipient-selector-panel {
+  background: rgba(11, 155, 119, 0.03);
+  border: 1px dashed rgba(11, 155, 119, 0.2);
+  border-radius: 24rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.selector-title {
+  font-size: 22rpx;
+  color: #809a96;
+  margin-bottom: 18rpx;
+  text-align: center;
+  font-weight: 500;
+}
+
+.tag-scroll-row {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.tag-row {
+  display: inline-flex;
+  gap: 14rpx;
+  padding: 4rpx 0;
+}
+
+.tag-btn {
+  font-size: 24rpx;
+  padding: 10rpx 24rpx;
+  border-radius: 14rpx;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #596c68;
+  white-space: nowrap;
+  transition: all 0.2s ease-in-out;
+}
+
+.tag-btn.active {
+  background: #0b9b77;
+  border-color: #0b9b77;
+  color: #ffffff;
+  font-weight: bold;
+  box-shadow: 0 4rpx 12rpx rgba(11, 155, 119, 0.2);
 }

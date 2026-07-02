@@ -31,6 +31,7 @@ Page({
     sortAscending: false,
     wins: 0,
     losses: 0,
+    totalGames: 0,
     winRate: 0,
     totalScore: 0,
 
@@ -142,6 +143,7 @@ Page({
         rawFriendsList: rankedList,
         wins: wins,
         losses: losses,
+        totalGames: total,
         winRate: winRate,
         totalScore: totalScore,
         hasMore: hasMoreData,

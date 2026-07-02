@@ -34,6 +34,10 @@
       <!-- 下半部分：赢输胜率统计 -->
       <view class="user-card-bottom flex-row justify-between width-100">
         <view class="stat-item">
+          <text class="stat-label">总</text>
+          <text class="stat-value text-blue">{{totalGames}} 局</text>
+        </view>
+        <view class="stat-item">
           <text class="stat-label">赢</text>
           <text class="stat-value text-red">{{wins}} 局</text>
         </view>
@@ -137,11 +141,11 @@
 
           <view class="friend-main-info flex-1 flex-column">
             <text class="friend-name">{{item.nickname}}</text>
-            <text class="friend-count">共同对局 {{item.play_count}} 次</text>
+            <text class="friend-count" wx:if="{{!item.isMe}}">共同对局 {{item.play_count}} 次</text>
           </view>
 
           <view class="friend-outcome-box flex-column align-end">
-            <text class="outcome-label">同场胜负累计</text>
+            <text class="outcome-label">{{item.isMe ? '胜负累计' : '同场胜负累计'}}</text>
             <text class="outcome-score {{item.net_score > 0 ? 'score-positive' : (item.net_score < 0 ? 'score-negative' : 'score-zero')}}" decode="{{true}}">{{item.net_score > 0 ? '+' + item.net_score : item.net_score}}&nbsp;分</text>
           </view>
         </view>

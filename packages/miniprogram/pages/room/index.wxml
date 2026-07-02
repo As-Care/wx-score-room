@@ -86,6 +86,13 @@
             <text class="refresh-text">刷新记账</text>
           </view>
         </view>
+        <view class="section-right flex-row align-center" wx:else>
+          <!-- 已结束房间查看结算单动作 -->
+          <view class="refresh-action flex-row align-center" bindtap="onOpenSettleReport">
+            <van-icon name="balance-list-o" size="12px" color="#0b9b77" style="margin-right: 6rpx;" />
+            <text class="refresh-text">查看结算单</text>
+          </view>
+        </view>
       </view>
 
       <!-- 统一的横向滚动/弹性平铺区域：1-5人平铺，超过5人支持向右流畅横向滑动，绑定动态人数类以完美自适应宽度 -->
@@ -360,78 +367,6 @@
     </view>
   </van-popup>
 
-  <van-popup
-    show="{{ showSettleReport }}"
-    round
-    closeable
-    bind:close="onCloseSettleReport"
-    custom-style="width: 85%; padding: 40rpx; border-radius: 40rpx; background: radial-gradient(circle at 50% 30%, #f7f9f8 0%, #edf2f0 100%);"
-  >
-    <view class="settle-popup-content flex-column flex-center">
-      <view class="crown-box flex-center">👑</view>
-      <text class="settle-title" style="margin-bottom: 20rpx;">游戏结算单</text>
-      
-      <!-- 滚动视图包容大赢家、排行榜和结算方案，防小屏幕溢出 -->
-      <scroll-view scroll-y="true" style="max-height: 55vh; width: 100%;">
-        <!-- MVP 荣誉位 -->
-        <view class="mvp-box flex-column flex-center" wx:if="{{mvpPlayer}}">
-          <view class="mvp-avatar-box flex-center">
-            <image class="mvp-avatar" src="{{mvpPlayer.avatar_url}}" wx:if="{{mvpPlayer.avatar_url}}"></image>
-            <view class="mvp-avatar-text flex-center" wx:else>{{mvpPlayer.nickname[0]}}</view>
-            <text class="mvp-badge">MVP</text>
-          </view>
-          <text class="mvp-name">{{mvpPlayer.nickname}}</text>
-          <text class="mvp-score {{mvpPlayer.score > 0 ? 'score-positive' : (mvpPlayer.score < 0 ? 'score-negative' : 'score-zero')}}">{{mvpPlayer.score > 0 ? '+' : ''}}{{mvpPlayer.score}} 分</text>
-        </view>
-
-        <!-- 排行榜列表 -->
-        <view class="rank-list" style="width: 100%; margin-top: 30rpx;">
-          <view class="rank-item justify-between align-center" wx:for="{{sortedPlayers}}" wx:key="user_id">
-            <view class="align-center">
-              <text class="rank-number {{index === 0 ? 'first' : (index === 1 ? 'second' : (index === 2 ? 'third' : ''))}}">{{index + 1}}</text>
-              <text class="rank-name ellipsis">{{item.nickname}}</text>
-            </view>
-            <text class="rank-score {{item.score > 0 ? 'score-positive' : (item.score < 0 ? 'score-negative' : 'score-zero')}}">
-              {{item.score > 0 ? '+' + item.score : item.score}} 分
-            </text>
-          </view>
-        </view>
-
-        <!-- 极简结算方案 -->
-        <view class="settle-scheme-box" wx:if="{{settleSchemes.length > 0}}" style="width: 100%; margin-top: 30rpx;">
-          <view class="scheme-title flex-row align-center">
-            <van-icon name="balance-list-o" color="#0b9b77" size="16px" style="margin-right: 8rpx;" />
-            <text class="scheme-title-text">极简结算方案</text>
-          </view>
-          <view class="scheme-list">
-            <view class="scheme-item flex-row align-center justify-between" wx:for="{{settleSchemes}}" wx:key="index">
-              <view class="flex-row align-center ellipsis" style="flex: 1; min-width: 0;">
-                <text class="scheme-name from-name ellipsis">{{item.from}}</text>
-                <text class="scheme-arrow">➔</text>
-                <text class="scheme-name to-name ellipsis">{{item.to}}</text>
-              </view>
-              <text class="scheme-amount">{{item.amount}} 分</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- 茶水累计最终播报 -->
-        <view class="settle-tea-summary flex-center" wx:if="{{roomInfo.accumulated_tea_money > 0}}" style="margin-top: 25rpx;">
-          <text>🍵 本局共收取茶水费: {{roomInfo.accumulated_tea_money}} 分</text>
-        </view>
-      </scroll-view>
-
-      <view class="settle-actions flex-row justify-between" style="width: 100%; margin-top: 35rpx;">
-        <view style="width: 48%;">
-          <van-button custom-class="btn-outline" custom-style="height: 92rpx; line-height: 90rpx; font-size: 30rpx; white-space: nowrap;" block bindtap="onCloseSettleReport">关闭</van-button>
-        </view>
-        <view style="width: 48%;">
-          <van-button custom-class="btn-green" custom-style="height: 92rpx; line-height: 92rpx; white-space: nowrap; font-size: 30rpx;" block bindtap="exitRoomToHome">返回游戏大厅</van-button>
-        </view>
-      </view>
-    </view>
-  </van-popup>
-
   <!-- 全屏加载层，防止页面拉取时闪烁和白屏，用户体验极佳 -->
   <view class="full-page-loading flex-column flex-center" wx:if="{{ isLoadingData }}">
     <van-loading size="36px" type="spinner" color="#0b9b77" vertical>
@@ -439,3 +374,97 @@
     </van-loading>
   </view>
 </view>
+
+<!-- 弹窗 4：结算大赢家海报弹窗 (脱离 room-page 滚动视图容器，确保在所有尺寸手机下都实现完美的屏幕视口上下居中) -->
+<van-popup
+  show="{{ showSettleReport }}"
+  round
+  closeable
+  bind:close="onCloseSettleReport"
+  custom-style="width: 85%; padding: 40rpx; border-radius: 40rpx; background: radial-gradient(circle at 50% 30%, #f7f9f8 0%, #edf2f0 100%); margin-top: 30rpx !important;"
+>
+  <view class="settle-popup-content flex-column flex-center">
+    <view class="crown-box flex-center">👑</view>
+    <text class="settle-title" style="margin-bottom: 20rpx;">游戏结算单</text>
+    
+    <!-- 滚动视图包容大赢家、排行榜和结算方案，防小屏幕溢出 -->
+    <scroll-view scroll-y="true" style="max-height: 55vh; width: 100%;">
+      <!-- MVP 荣誉位 -->
+      <view class="mvp-box flex-column flex-center" wx:if="{{mvpPlayer}}">
+        <view class="mvp-avatar-box flex-center">
+          <image class="mvp-avatar" src="{{mvpPlayer.avatar_url}}" wx:if="{{mvpPlayer.avatar_url}}"></image>
+          <view class="mvp-avatar-text flex-center" wx:else>{{mvpPlayer.nickname[0]}}</view>
+          <text class="mvp-badge">MVP</text>
+        </view>
+        <text class="mvp-name">{{mvpPlayer.nickname}}</text>
+        <text class="mvp-score {{mvpPlayer.score > 0 ? 'score-positive' : (mvpPlayer.score < 0 ? 'score-negative' : 'score-zero')}}">{{mvpPlayer.score > 0 ? '+' : ''}}{{mvpPlayer.score}} 分</text>
+      </view>
+
+      <!-- 排行榜列表 -->
+      <view class="rank-list" style="width: 100%; margin-top: 30rpx;">
+        <view class="rank-item justify-between align-center" wx:for="{{sortedPlayers}}" wx:key="user_id">
+          <view class="align-center">
+            <text class="rank-number {{index === 0 ? 'first' : (index === 1 ? 'second' : (index === 2 ? 'third' : ''))}}">{{index + 1}}</text>
+            <text class="rank-name ellipsis">{{item.nickname}}</text>
+          </view>
+          <text class="rank-score {{item.score > 0 ? 'score-positive' : (item.score < 0 ? 'score-negative' : 'score-zero')}}">
+            {{item.score > 0 ? '+' + item.score : item.score}} 分
+          </text>
+        </view>
+      </view>
+
+      <!-- 茶水累计最终播报 -->
+      <view class="settle-tea-summary flex-center" wx:if="{{roomInfo.accumulated_tea_money > 0}}" style="margin-top: 30rpx;">
+        <text>🍵 本局共收取茶水费: {{roomInfo.accumulated_tea_money}} 分</text>
+      </view>
+
+      <!-- 茶水金库结算对象选择器 -->
+      <view class="tea-recipient-selector-panel" wx:if="{{roomInfo.accumulated_tea_money > 0}}" style="width: 100%; margin-top: 30rpx;">
+        <view class="selector-title">请选择茶水金库结算对象，选择后茶水金库将转给该用户</view>
+        <scroll-view class="tag-scroll-row" scroll-x="true" enhanced show-scrollbar="{{false}}">
+          <view class="tag-row flex-row">
+            <view class="tag-btn {{selectedTeaRecipientId === null ? 'active' : ''}}" bindtap="onSelectTeaRecipient" data-id="{{null}}">
+              不结算
+            </view>
+            <view 
+              class="tag-btn {{selectedTeaRecipientId === item.user_id ? 'active' : ''}}" 
+              wx:for="{{players}}" 
+              wx:key="user_id" 
+              bindtap="onSelectTeaRecipient" 
+              data-id="{{item.user_id}}"
+            >
+              {{item.nickname}}
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+
+      <!-- 极简结算方案 -->
+      <view class="settle-scheme-box" wx:if="{{settleSchemes.length > 0}}" style="width: 100%; margin-top: 30rpx;">
+        <view class="scheme-title flex-row align-center">
+          <van-icon name="balance-list-o" color="#0b9b77" size="16px" style="margin-right: 8rpx;" />
+          <text class="scheme-title-text">极简结算方案</text>
+        </view>
+        <view class="scheme-list">
+          <view class="scheme-item flex-row align-center justify-between" wx:for="{{settleSchemes}}" wx:key="index">
+            <view class="flex-row align-center ellipsis" style="flex: 1; min-width: 0;">
+              <text class="scheme-name from-name ellipsis">{{item.from}}</text>
+              <text class="scheme-arrow">➔</text>
+              <text class="scheme-name to-name ellipsis">{{item.to}}</text>
+            </view>
+            <text class="scheme-amount">{{item.amount}} 分</text>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+
+    <view class="settle-actions flex-row justify-between" style="width: 100%; margin-top: 35rpx;">
+      <view style="width: 48%;">
+        <van-button custom-class="btn-outline" custom-style="height: 92rpx; line-height: 90rpx; font-size: 30rpx; white-space: nowrap;" block bindtap="onCloseSettleReport">关闭</van-button>
+      </view>
+      <view style="width: 48%;">
+        <van-button custom-class="btn-green" custom-style="height: 92rpx; line-height: 92rpx; white-space: nowrap; font-size: 30rpx;" block bindtap="exitRoomToHome">返回游戏大厅</van-button>
+      </view>
+    </view>
+  </view>
+</van-popup>

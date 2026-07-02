@@ -881,7 +881,7 @@ app.get('/api/user/history', async (c) => {
               AND EXISTS (SELECT 1 FROM transactions t WHERE t.room_id = r.id AND t.is_undone = 0) \
               AND (SELECT COUNT(1) FROM room_users ru3 WHERE ru3.room_id = r.id) > 1) \
            ) \
-         ORDER BY r.id DESC \
+         ORDER BY r.created_at DESC \
          LIMIT ? OFFSET ?'
       )
       .bind(user.id, limit, offset)
