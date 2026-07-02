@@ -455,15 +455,15 @@ app.post('/api/room/join', async (c) => {
       return jsonErr(404, '房间不存在');
     }
 
-    if (room.status === 1) {
-      return jsonErr(403, '该房间对局已结算结束');
-    }
-
     // 检查是否已经在房间中
     const member = await c.env.DB
       .prepare('SELECT score FROM room_users WHERE room_id = ? AND user_id = ?')
       .bind(room.id, user.id)
       .first();
+
+    if (room.status === 1 && !member) {
+      return jsonErr(403, '该房间对局已结算结束');
+    }
 
     if (!member) {
       // D1 Batch: 插入玩家，递增版本号

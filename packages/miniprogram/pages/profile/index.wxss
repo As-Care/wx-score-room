@@ -359,8 +359,15 @@
 
 /* 空状态占位 */
 .empty-state {
-  padding: 120rpx 0;
+  padding: 100rpx 0;
   gap: 20rpx;
+}
+
+.empty-image {
+  width: 100%;
+  height: 400rpx;
+  margin-bottom: 12rpx;
+  opacity: 0.85;
 }
 
 .empty-text {

@@ -454,12 +454,22 @@
       </view>
     </scroll-view>
 
-    <view class="settle-actions flex-row justify-between" style="width: 100%; margin-top: 35rpx;">
-      <view style="width: 48%;">
-        <van-button custom-class="btn-outline" custom-style="height: 92rpx; line-height: 90rpx; font-size: 30rpx; white-space: nowrap;" block bindtap="onCloseSettleReport">关闭</van-button>
+    <view class="settle-actions flex-row justify-between" style="width: 100%; margin-top: 30rpx; display: flex; flex-direction: row; align-items: center;">
+      <view style="width: 31%;">
+        <van-button custom-class="btn-outline" custom-style="height: 92rpx; line-height: 90rpx; font-size: 28rpx; white-space: nowrap; padding: 0;" block bindtap="onCloseSettleReport">关闭</van-button>
       </view>
-      <view style="width: 48%;">
-        <van-button custom-class="btn-green" custom-style="height: 92rpx; line-height: 92rpx; white-space: nowrap; font-size: 30rpx;" block bindtap="exitRoomToHome">返回游戏大厅</van-button>
+      <view style="width: 31%;">
+        <van-button custom-class="btn-outline" custom-style="height: 92rpx; line-height: 90rpx; font-size: 28rpx; white-space: nowrap; padding: 0;" block bindtap="exitRoomToHome">返回大厅</van-button>
+      </view>
+      <view style="width: 31%;">
+        <van-button 
+          custom-class="btn-green" 
+          custom-style="height: 92rpx; line-height: 92rpx; font-size: 28rpx; white-space: nowrap; padding: 0;" 
+          block 
+          open-type="share"
+        >
+          分享对账单
+        </van-button>
       </view>
     </view>
   </view>

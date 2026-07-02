@@ -116,8 +116,10 @@
         
         <view class="empty-state flex-column flex-center" wx:if="{{historyRooms.length === 0}}">
           <van-loading size="48px" type="spinner" color="#0b9b77" wx:if="{{isLoading}}" />
-          <van-icon name="todo-list-o" size="48px" color="#809a96" wx:else />
-          <text class="empty-text">{{isLoading ? '正在加载，请稍后...' : '你还没有参与过任何游戏对局'}}</text>
+          <block wx:else>
+            <image class="empty-image" src="https://score-room.carelife.top/common/empty.png" mode="aspectFit"></image>
+            <text class="empty-text">你还没有参与过任何游戏对局</text>
+          </block>
         </view>
       </view>
 
@@ -152,8 +154,10 @@
 
         <view class="empty-state flex-column flex-center" wx:if="{{friendsList.length === 0}}">
           <van-loading size="48px" type="spinner" color="#0b9b77" wx:if="{{isLoading}}" />
-          <van-icon name="cluster-o" size="48px" color="#809a96" wx:else />
-          <text class="empty-text">{{isLoading ? '正在加载，请稍后...' : '暂无一起游戏过的亲友，快去邀请他们吧'}}</text>
+          <block wx:else>
+            <image class="empty-image" src="https://score-room.carelife.top/common/empty.png" mode="aspectFit"></image>
+            <text class="empty-text">暂无一起游戏过的亲友，快去邀请他们吧</text>
+          </block>
         </view>
       </view>
 
