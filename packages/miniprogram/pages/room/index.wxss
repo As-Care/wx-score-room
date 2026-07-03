@@ -1129,7 +1129,7 @@
 .connection-status-bar {
   display: inline-flex;
   align-items: center;
-  margin: 0 0 4rpx 20rpx;
+  margin: 0 0 0 20rpx;
   padding: 0 10rpx;
   height: 34rpx;
 }
