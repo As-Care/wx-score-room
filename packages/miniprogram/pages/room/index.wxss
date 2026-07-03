@@ -1124,3 +1124,69 @@
   color: #ffffff;
   box-shadow: 0 4rpx 12rpx rgba(11, 155, 119, 0.2);
 }
+
+/* 实时同步状态条 */
+.connection-status-bar {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 4rpx 20rpx;
+  padding: 0 10rpx;
+  height: 34rpx;
+}
+
+.status-indicator-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  margin-right: 12rpx;
+  flex-shrink: 0;
+}
+
+.status-indicator-dot.green {
+  background-color: #0b9b77;
+  box-shadow: 0 0 6rpx rgba(11, 155, 119, 0.4);
+}
+
+.status-indicator-dot.yellow {
+  background-color: #f4a261;
+  box-shadow: 0 0 6rpx rgba(244, 162, 97, 0.4);
+  animation: pulse-dot 1.5s infinite ease-in-out;
+}
+
+.status-indicator-dot.grey {
+  background-color: #b2c4c1;
+}
+
+.status-indicator-text {
+  font-size: 20rpx;
+  color: #809a96;
+  font-weight: 500;
+  line-height: 1;
+}
+
+@keyframes pulse-dot {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* 账单局数标签 */
+.tx-round-tag {
+  width: 68rpx;
+  height: 38rpx;
+  background: rgba(11, 155, 119, 0.08);
+  border-radius: 8rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.tx-round-text {
+  font-size: 22rpx;
+  font-weight: bold;
+  color: #0b9b77;
+}
+
+.tx-detail-box {
+  flex: 1;
+  min-width: 0;
+}

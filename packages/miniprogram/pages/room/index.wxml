@@ -11,7 +11,7 @@
     }
   };
 </wxs>
-<view class="page-container room-page {{roomStatus === 1 ? 'room-page-scrollable' : ''}}">
+<view class="page-container room-page {{roomStatus === 1 ? 'room-page-scrollable' : ''}}" bindtap="onPageTouch">
   <!-- 自定义高端导航栏 -->
   <view class="custom-navbar" style="height: {{statusBarHeight + navBarHeight}}px; padding-top: {{statusBarHeight}}px;">
     <view class="navbar-back flex-center" bindtap="goBack">
@@ -22,6 +22,12 @@
 
   <view class="content-wrapper" style="padding-top: {{statusBarHeight + navBarHeight + 10}}px;">
     
+    <!-- 实时同步长连接状态灯指示条 -->
+    <view class="connection-status-bar flex-row align-center" wx:if="{{roomInfo.status !== 1}}" catchtap="wakeUpConnection">
+      <view class="status-indicator-dot {{wsStatusClass}}"></view>
+      <text class="status-indicator-text">{{wsStatusText}}</text>
+    </view>
+
     <!-- 房间头部看板 (茶水钱和状态) -->
     <view class="glass-card room-header-card">
       <view class="justify-between align-center">
@@ -95,6 +101,7 @@
         </view>
       </view>
 
+
       <!-- 统一的横向滚动/弹性平铺区域：1-5人平铺，超过5人支持向右流畅横向滑动，绑定动态人数类以完美自适应宽度 -->
       <scroll-view class="players-scroll-container players-count-{{players.length}}" scroll-x="{{players.length > 5}}" enhanced show-scrollbar="{{false}}">
         <view class="players-row flex-row">
@@ -160,6 +167,11 @@
           <!-- 撤销状态遮罩层 -->
           <view class="tx-undone-mask flex-center" wx:if="{{item.is_undone === 1}}">
             <text class="tx-undone-text">已撤销</text>
+          </view>
+
+          <!-- 局数标志 (R1, R2, R3...) -->
+          <view class="tx-round-tag flex-center">
+            <text class="tx-round-text">{{item.round_name}}</text>
           </view>
 
           <view class="tx-detail-box flex-column">

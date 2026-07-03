@@ -74,7 +74,9 @@ Page({
     isTrendExpanded: false,
     ec: {
       lazyLoad: true
-    }
+    },
+    wsStatusClass: 'grey', // 'green' | 'yellow' | 'grey'
+    wsStatusText: '连接已休眠，点击屏幕或开始记分时自动激活'
   },
 
   socketTask: null, // 用于实时同步的 WebSocket 实例
@@ -98,16 +100,25 @@ Page({
     this.pollRoomData();
     // 2. 仅在进行中房间才建立 WebSocket 实时推送长连接，避免对已结束房间的无意义网络开销
     if (this.data.roomStatus !== 1) {
+      this.isDormant = false; // 每次切回前台重置休眠状态
       this.connectWebSocket();
     }
   },
 
   onHide: function () {
+    if (this.dormancyTimer) {
+      clearTimeout(this.dormancyTimer);
+      this.dormancyTimer = null;
+    }
     // 页面隐藏、切后台或熄屏时，关闭 WebSocket 连接以省电并释放服务器资源
     this.closeWebSocket();
   },
 
   onUnload: function () {
+    if (this.dormancyTimer) {
+      clearTimeout(this.dormancyTimer);
+      this.dormancyTimer = null;
+    }
     // 页面关闭销毁时，彻底关闭并释放 WebSocket 连接
     this.closeWebSocket();
   },
@@ -140,6 +151,12 @@ Page({
   // 建立 WebSocket 连接实现 0 延迟实时推送
   connectWebSocket: function () {
     this.closeWebSocket(); // 确保安全，先关闭已有的连接
+    this.isDormant = false; // 重置休眠标志
+
+    this.setData({
+      wsStatusClass: 'yellow',
+      wsStatusText: '正在连接中...'
+    });
 
     const apiProtocol = app.globalData.apiUrl.startsWith('https') ? 'wss' : 'ws';
     // 防御处理：去除开头协议和结尾的斜杠，防止出现双斜线导致微信 WS 解析失败
@@ -156,6 +173,10 @@ Page({
       },
       fail: (err) => {
         console.error('WebSocket 发起连接失败', err);
+        this.setData({
+          wsStatusClass: 'yellow',
+          wsStatusText: '正在连接中...'
+        });
       }
     });
 
@@ -163,6 +184,11 @@ Page({
 
     socketTask.onOpen(() => {
       console.log('WebSocket 连接已成功建立');
+      this.setData({
+        wsStatusClass: 'green',
+        wsStatusText: '已连接'
+      });
+      this.startDormancyTimer(); // 连接成功后，启动 10 分钟休眠倒计时
     });
 
     socketTask.onMessage((res) => {
@@ -196,11 +222,7 @@ Page({
             if (b.user_id === myId) return 1;
             return 0;
           });
-          const formattedTransactions = (data.transactions || []).map(t => ({
-            ...t,
-            tea_deducted: this.sanitizeScore(t.tea_deducted),
-            created_at: formatLocalTime(t.created_at)
-          }));
+          const formattedTransactions = this.formatTransactionsList(data.transactions);
           const personalTxs = formattedTransactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
 
           const isJustSettled = this.data.roomInfo.status === 0;
@@ -223,6 +245,9 @@ Page({
             this.drawTrendChart();
           });
 
+          // 核心逻辑：收到其他玩家的记分更新，说明房间处于活跃状态，重置当前用户的 10 分钟休眠倒计时
+          this.startDormancyTimer();
+
           if (room.status === 1) {
             this.closeWebSocket();
             if (!this.data.hasViewedSettle && !this.data.showSettleReport) {
@@ -240,6 +265,17 @@ Page({
       // 如果不是我们主动清空的，说明是异常断开（比如网络瞬断），尝试自动重连
       if (this.socketTask === socketTask) {
         this.socketTask = null;
+        
+        // 如果是因为主动休眠断开，则不进行异常自动重连
+        if (this.isDormant) {
+          return;
+        }
+
+        this.setData({
+          wsStatusClass: 'yellow',
+          wsStatusText: '正在连接中...'
+        });
+
         // 如果页面依然处于可见状态，尝试延时自动重连
         if (!this.reconnectTimer && this.data.roomId) {
           console.log('检测到非主动断开，准备 3 秒后尝试自动重连...');
@@ -273,6 +309,57 @@ Page({
         }
       });
       this.socketTask = null;
+    }
+  },
+
+  // 启动/重置 10 分钟休眠倒计时
+  startDormancyTimer: function () {
+    if (this.dormancyTimer) {
+      clearTimeout(this.dormancyTimer);
+      this.dormancyTimer = null;
+    }
+    
+    // 只有进行中的对局且未处于休眠状态时，才启动 5 分钟休眠倒计时
+    if (this.data.roomStatus !== 1 && !this.isDormant) {
+      this.dormancyTimer = setTimeout(() => {
+        this.enterDormancy();
+      }, 300000); // 5分钟 = 300,000 毫秒
+    }
+  },
+
+  // 释放连接进入休眠状态
+  enterDormancy: function () {
+    if (this.data.roomStatus === 1) return;
+    
+    console.log('检测到 5 分钟无操作，长连接自动断开进入休眠状态以节省资源...');
+    this.isDormant = true;
+    this.closeWebSocket();
+    this.setData({
+      wsStatusClass: 'grey',
+      wsStatusText: '连接已休眠，点击屏幕或开始记分时自动激活'
+    });
+  },
+
+  // 主动唤醒并重连 WebSocket
+  wakeUpConnection: function () {
+    if (this.data.roomStatus === 1) return;
+
+    if (this.isDormant || !this.socketTask) {
+      console.log('触发连接唤醒，正在重新建立长连接...');
+      this.isDormant = false;
+      this.connectWebSocket();
+      this.pollRoomData(); // 唤醒时主动拉取一次最新数据
+    }
+  },
+
+  // 页面触摸/点击屏幕任意处触发（用于触屏重新唤醒或刷新休眠定时器）
+  onPageTouch: function () {
+    if (this.data.roomStatus === 1) return;
+
+    if (this.isDormant) {
+      this.wakeUpConnection();
+    } else {
+      this.startDormancyTimer(); // 活跃状态下，重置 10 分钟计时器
     }
   },
 
@@ -310,11 +397,7 @@ Page({
           if (b.user_id === myId) return 1;
           return 0;
         });
-        const formattedTransactions = (transactions || []).map(t => ({
-          ...t,
-          tea_deducted: this.sanitizeScore(t.tea_deducted),
-          created_at: formatLocalTime(t.created_at)
-        }));
+        const formattedTransactions = this.formatTransactionsList(transactions);
         const personalTxs = formattedTransactions.filter(t => t.from_user_id === myId || t.to_user_id === myId);
 
         const isJustSettled = this.data.roomInfo.status === 0;
@@ -1069,6 +1152,28 @@ Page({
     if (isNaN(parsed)) return 0;
     // 保留最多两位小数，并去除末尾无用的 0
     return Math.round(parsed * 100) / 100;
+  },
+
+  // 格式化交易流水列表，并计算局数序号（R1, R2, R3...）
+  formatTransactionsList: function (transactions) {
+    const formatted = (transactions || []).map(t => ({
+      ...t,
+      tea_deducted: this.sanitizeScore(t.tea_deducted),
+      created_at: formatLocalTime(t.created_at)
+    }));
+
+    // 按时间顺序（正序）计算对应的局数序号 R1, R2, R3...
+    // 数组中 index 越往后说明时间越新，因此需要从后往前逆序推进分配局数
+    let roundCounter = 0;
+    for (let i = formatted.length - 1; i >= 0; i--) {
+      if (formatted[i].is_undone !== 1) {
+        roundCounter++;
+        formatted[i].round_name = `R${roundCounter}`;
+      } else {
+        formatted[i].round_name = '—'; // 撤销对局展示横线
+      }
+    }
+    return formatted;
   },
 
   // 快捷分值标签点击回调
