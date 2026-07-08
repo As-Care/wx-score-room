@@ -959,6 +959,156 @@ app.get('/api/user/history', async (c) => {
   } catch (err: any) {
     return jsonErr(401, err.message || '未授权操作');
   }
+});// ==================== 管理端 (Admin) 接口与鉴权中间件 ====================
+
+function authenticateAdmin(request: Request) {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader) {
+    throw new Error('未携带管理员登录凭证');
+  }
+
+  const token = authHeader.replace('Bearer ', '').trim();
+  if (token !== 'admin_token_secret') {
+    throw new Error('无效的管理员登录凭证');
+  }
+}
+
+// 1. 管理员登录
+app.post('/api/admin/login', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { username, password } = body;
+
+    if (username === 'admin' && password === 'admin123!') {
+      return jsonOk({ token: 'admin_token_secret' });
+    } else {
+      return jsonErr(401, '用户名或密码错误');
+    }
+  } catch (err: any) {
+    return jsonErr(500, err.message || '系统错误');
+  }
+});
+
+// 2. 房间列表 (管理端)
+app.get('/api/admin/rooms', async (c) => {
+  try {
+    authenticateAdmin(c.req.raw);
+
+    const page = parseInt(c.req.query('page') || '1');
+    const pageSize = parseInt(c.req.query('pageSize') || '10');
+    const roomCode = c.req.query('room_code') || '';
+
+    const offset = (page - 1) * pageSize;
+    const roomCodePattern = roomCode ? `%${roomCode}%` : '%';
+
+    // 查询符合条件的房间总数
+    const countRes = await c.env.DB
+      .prepare('SELECT COUNT(*) as total FROM rooms WHERE room_code LIKE ?')
+      .bind(roomCodePattern)
+      .first<any>();
+    const total = countRes?.total || 0;
+
+    // 查询房间列表详情并关联创建者和人数
+    const listRes = await c.env.DB
+      .prepare(
+        `SELECT r.id, r.room_code, r.total_tea_money, r.tea_money_per_tx, r.tea_mode,
+                r.accumulated_tea_money, r.version, r.status, r.created_at,
+                u.nickname as owner_nickname,
+                (SELECT COUNT(*) FROM room_users ru WHERE ru.room_id = r.id) as player_count
+         FROM rooms r
+         LEFT JOIN users u ON r.owner_id = u.id
+         WHERE r.room_code LIKE ?
+         ORDER BY r.id DESC
+         LIMIT ? OFFSET ?`
+      )
+      .bind(roomCodePattern, pageSize, offset)
+      .all<any>();
+
+    return jsonOk({
+      list: listRes.results || [],
+      total,
+      page,
+      pageSize
+    });
+  } catch (err: any) {
+    return jsonErr(401, err.message || '未授权操作');
+  }
+});
+
+// 3. 房间流水详情 (管理端)
+app.get('/api/admin/room/transactions', async (c) => {
+  try {
+    authenticateAdmin(c.req.raw);
+
+    const roomId = parseInt(c.req.query('room_id') || '0');
+    if (!roomId) {
+      return jsonErr(400, '缺失房间ID');
+    }
+
+    const txs = await c.env.DB
+      .prepare(
+        `SELECT t.id, t.amount, t.tea_deducted, t.is_undone, t.created_at,
+                u1.nickname as from_nickname,
+                COALESCE(u2.nickname, '茶水金库') as to_nickname
+         FROM transactions t
+         LEFT JOIN users u1 ON t.from_user_id = u1.id
+         LEFT JOIN users u2 ON t.to_user_id = u2.id
+         WHERE t.room_id = ?
+         ORDER BY t.id DESC`
+      )
+      .bind(roomId)
+      .all<any>();
+
+    return jsonOk(txs.results || []);
+  } catch (err: any) {
+    return jsonErr(401, err.message || '未授权操作');
+  }
+});
+
+// 4. 用户列表 (管理端)
+app.get('/api/admin/users', async (c) => {
+  try {
+    authenticateAdmin(c.req.raw);
+
+    const page = parseInt(c.req.query('page') || '1');
+    const pageSize = parseInt(c.req.query('pageSize') || '10');
+    const nickname = c.req.query('nickname') || '';
+
+    const offset = (page - 1) * pageSize;
+    const nicknamePattern = nickname ? `%${nickname}%` : '%';
+
+    // 查询用户总数
+    const countRes = await c.env.DB
+      .prepare('SELECT COUNT(*) as total FROM users WHERE nickname LIKE ?')
+      .bind(nicknamePattern)
+      .first<any>();
+    const total = countRes?.total || 0;
+
+    // 查询用户明细及积分汇总统计
+    const listRes = await c.env.DB
+      .prepare(
+        `SELECT u.id, u.nickname, u.avatar_url, u.openid, u.created_at,
+                (SELECT COUNT(*) FROM room_users ru WHERE ru.user_id = u.id) as total_games,
+                (SELECT COUNT(*) FROM room_users ru WHERE ru.user_id = u.id AND ru.score > 0) as won_games,
+                (SELECT COUNT(*) FROM room_users ru WHERE ru.user_id = u.id AND ru.score < 0) as lost_games,
+                (SELECT COALESCE(SUM(ru.score), 0) FROM room_users ru WHERE ru.user_id = u.id) as total_score
+         FROM users u
+         WHERE u.nickname LIKE ?
+         ORDER BY u.id DESC
+         LIMIT ? OFFSET ?`
+      )
+      .bind(nicknamePattern, pageSize, offset)
+      .all<any>();
+
+    return jsonOk({
+      list: listRes.results || [],
+      total,
+      page,
+      pageSize
+    });
+  } catch (err: any) {
+    return jsonErr(401, err.message || '未授权操作');
+  }
 });
 
 
