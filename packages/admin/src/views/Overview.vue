@@ -24,7 +24,7 @@
       <a-col :span="6">
         <div class="stat-card glass-panel gradient-green">
           <div class="card-icon-wrapper">
-            <IconLiveclass class="card-icon" />
+            <IconPlayCircle class="card-icon" />
           </div>
           <div class="stat-details">
             <span class="stat-label">进行中活跃房间</span>
