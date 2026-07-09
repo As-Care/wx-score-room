@@ -20,6 +20,7 @@
         :pagination="false"
         :bordered="false"
         class="custom-table"
+        @change="handleTableChange"
       >
         <template #columns>
           <a-table-column title="ID" data-index="id" :width="70" />
@@ -36,24 +37,24 @@
               <span class="user-nickname">{{ record.nickname }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="总参局数" data-index="total_games">
+          <a-table-column title="总参局数" data-index="total_games" :sortable="{ sortDirections: ['ascend', 'descend'], sorter: true }">
             <template #cell="{ record }">
               <span class="games-badge">{{ record.total_games }} 局</span>
             </template>
           </a-table-column>
-          <a-table-column title="赢局数" data-index="won_games">
+          <a-table-column title="赢局数" data-index="won_games" :sortable="{ sortDirections: ['ascend', 'descend'], sorter: true }">
             <template #cell="{ record }">
               <span v-if="record.won_games > 0" class="win-color">+{{ record.won_games }} 局</span>
               <span v-else class="text-muted">0 局</span>
             </template>
           </a-table-column>
-          <a-table-column title="输局数" data-index="lost_games">
+          <a-table-column title="输局数" data-index="lost_games" :sortable="{ sortDirections: ['ascend', 'descend'], sorter: true }">
             <template #cell="{ record }">
               <span v-if="record.lost_games > 0" class="loss-color">-{{ record.lost_games }} 局</span>
               <span v-else class="text-muted">0 局</span>
             </template>
           </a-table-column>
-          <a-table-column title="胜率">
+          <a-table-column title="胜率" data-index="win_rate" :sortable="{ sortDirections: ['ascend', 'descend'], sorter: true }">
             <template #cell="{ record }">
               <a-progress
                 type="circle"
@@ -65,7 +66,7 @@
               <span class="win-rate-text">{{ getWinRate(record) }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="历史总积分" data-index="total_score">
+          <a-table-column title="历史总积分" data-index="total_score" :sortable="{ sortDirections: ['ascend', 'descend'], sorter: true }">
             <template #cell="{ record }">
               <span :class="['total-score-badge', record.total_score > 0 ? 'score-win' : (record.total_score < 0 ? 'score-loss' : 'score-zero')]">
                 {{ record.total_score > 0 ? '+' : '' }}{{ record.total_score }} 分
@@ -105,7 +106,9 @@ const total = ref(0);
 const loading = ref(false);
 
 const query = reactive({
-  nickname: ''
+  nickname: '',
+  sortField: '',
+  sortOrder: ''
 });
 
 const pagination = reactive({
@@ -120,6 +123,8 @@ const handleSearch = () => {
 
 const handleReset = () => {
   query.nickname = '';
+  query.sortField = '';
+  query.sortOrder = '';
   pagination.page = 1;
   fetchUsers();
 };
@@ -129,11 +134,23 @@ const handlePageChange = (page) => {
   fetchUsers();
 };
 
+const handleTableChange = (data, extra) => {
+  if (extra && extra.sorter) {
+    query.sortField = extra.sorter.field || '';
+    query.sortOrder = extra.sorter.direction || '';
+  } else {
+    query.sortField = '';
+    query.sortOrder = '';
+  }
+  pagination.page = 1;
+  fetchUsers();
+};
+
 const fetchUsers = async () => {
   loading.value = true;
   const token = localStorage.getItem('admin_token');
   try {
-    const url = `${API_BASE}/api/admin/users?page=${pagination.page}&pageSize=${pagination.pageSize}&nickname=${query.nickname}`;
+    const url = `${API_BASE}/api/admin/users?page=${pagination.page}&pageSize=${pagination.pageSize}&nickname=${query.nickname}&sortField=${query.sortField}&sortOrder=${query.sortOrder}`;
     const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`
@@ -141,7 +158,10 @@ const fetchUsers = async () => {
     });
     const result = await response.json();
     if (result.code === 0) {
-      list.value = result.data.list;
+      list.value = (result.data.list || []).map(u => ({
+        ...u,
+        win_rate: u.total_games > 0 ? parseFloat(((u.won_games / u.total_games) * 100).toFixed(1)) : 0
+      }));
       total.value = result.data.total;
     } else {
       Message.error(result.message || '获取用户列表失败');
@@ -228,6 +248,10 @@ onMounted(() => {
   color: #2d3748;
 }
 
+body[arco-theme='dark'] .user-nickname {
+  color: #e2e8f0;
+}
+
 .games-badge {
   font-weight: 600;
   background: rgba(0, 150, 199, 0.05);
@@ -252,6 +276,10 @@ onMounted(() => {
   font-weight: 600;
   font-size: 14px;
   color: #2d3748;
+}
+
+body[arco-theme='dark'] .win-rate-text {
+  color: #e2e8f0;
 }
 
 .total-score-badge {

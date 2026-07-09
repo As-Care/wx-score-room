@@ -20,6 +20,7 @@
         :pagination="false"
         :bordered="false"
         class="custom-table"
+        @change="handleTableChange"
       >
         <template #columns>
           <a-table-column title="ID" data-index="id" :width="70" />
@@ -58,17 +59,43 @@
               <span v-else class="text-muted">未开启</span>
             </template>
           </a-table-column>
+          <a-table-column title="最大赢家" data-index="max_winner_score" :sortable="{ sortDirections: ['ascend', 'descend'], sorter: true }">
+            <template #cell="{ record }">
+              <span v-if="record.max_winner_name" class="win-color">
+                👑 {{ record.max_winner_name }} (+{{ record.max_winner_score }}分)
+              </span>
+              <span v-else class="text-muted">—</span>
+            </template>
+          </a-table-column>
+          <a-table-column title="最大输家" data-index="max_loser_score" :sortable="{ sortDirections: ['ascend', 'descend'], sorter: true }">
+            <template #cell="{ record }">
+              <span v-if="record.max_loser_name" class="loss-color">
+                💸 {{ record.max_loser_name }} ({{ record.max_loser_score }}分)
+              </span>
+              <span v-else class="text-muted">—</span>
+            </template>
+          </a-table-column>
           <a-table-column title="创建时间" data-index="created_at">
             <template #cell="{ record }">
               <span>{{ formatTime(record.created_at) }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="操作" :width="130">
+          <a-table-column title="操作" :width="110" align="center">
             <template #cell="{ record }">
-              <a-button type="outline" size="small" @click="showTransactions(record)" class="action-btn">
-                <template #icon><icon-list /></template>
-                流水对账单
-              </a-button>
+              <div class="action-group">
+                <a-tooltip content="查看对账单" position="top">
+                  <a-button type="outline" shape="circle" size="small" @click="showTransactions(record)" class="action-btn" style="margin-right: 8px">
+                    <template #icon><icon-list /></template>
+                  </a-button>
+                </a-tooltip>
+                <a-tooltip :content="record.status !== 1 ? '进行中的房间不可删除' : '删除房间'" position="top">
+                  <a-popconfirm content="确认删除该房间的所有数据（包含流水、玩家战绩和总积分）吗？此操作无法恢复。" position="tr" type="warning" @ok="handleDeleteRoom(record)">
+                    <a-button type="outline" status="danger" shape="circle" size="small" class="delete-btn" :disabled="record.status !== 1">
+                      <template #icon><icon-delete /></template>
+                    </a-button>
+                  </a-popconfirm>
+                </a-tooltip>
+              </div>
             </template>
           </a-table-column>
         </template>
@@ -163,7 +190,9 @@ const total = ref(0);
 const loading = ref(false);
 
 const query = reactive({
-  room_code: ''
+  room_code: '',
+  sortField: '',
+  sortOrder: ''
 });
 
 const pagination = reactive({
@@ -178,6 +207,8 @@ const handleSearch = () => {
 
 const handleReset = () => {
   query.room_code = '';
+  query.sortField = '';
+  query.sortOrder = '';
   pagination.page = 1;
   fetchRooms();
 };
@@ -187,11 +218,23 @@ const handlePageChange = (page) => {
   fetchRooms();
 };
 
+const handleTableChange = (data, extra) => {
+  if (extra && extra.sorter) {
+    query.sortField = extra.sorter.field || '';
+    query.sortOrder = extra.sorter.direction || '';
+  } else {
+    query.sortField = '';
+    query.sortOrder = '';
+  }
+  pagination.page = 1;
+  fetchRooms();
+};
+
 const fetchRooms = async () => {
   loading.value = true;
   const token = localStorage.getItem('admin_token');
   try {
-    const url = `${API_BASE}/api/admin/rooms?page=${pagination.page}&pageSize=${pagination.pageSize}&room_code=${query.room_code}`;
+    const url = `${API_BASE}/api/admin/rooms?page=${pagination.page}&pageSize=${pagination.pageSize}&room_code=${query.room_code}&sortField=${query.sortField}&sortOrder=${query.sortOrder}`;
     const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`
@@ -243,6 +286,29 @@ const showTransactions = async (room) => {
     Message.error('请求流水详情失败');
   } finally {
     txLoading.value = false;
+  }
+};
+
+const handleDeleteRoom = async (room) => {
+  const token = localStorage.getItem('admin_token');
+  try {
+    const url = `${API_BASE}/api/admin/room?room_id=${room.id}`;
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    const result = await response.json();
+    if (result.code === 0) {
+      Message.success('房间及其关联的所有数据已成功彻底删除！');
+      fetchRooms(); // 重新加载表格数据
+    } else {
+      Message.error(result.message || '删除房间失败');
+    }
+  } catch (err) {
+    console.error('Delete room error', err);
+    Message.error('网络错误或无权限，删除房间失败');
   }
 };
 
@@ -311,6 +377,10 @@ onMounted(() => {
   color: #2d3748;
 }
 
+body[arco-theme='dark'] .tea-info {
+  color: #e2e8f0;
+}
+
 .tea-num {
   font-weight: 700;
   color: #0b9b77;
@@ -346,6 +416,9 @@ onMounted(() => {
 
 .modal-loading {
   height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .round-badge {
@@ -381,8 +454,22 @@ onMounted(() => {
   color: #718096;
 }
 
+body[arco-theme='dark'] .time-text {
+  color: #a0aec0;
+}
+
 .empty-tx {
   padding: 40px 0;
+}
+
+.win-color {
+  color: #0b9b77;
+  font-weight: 600;
+}
+
+.loss-color {
+  color: #e53e3e;
+  font-weight: 600;
 }
 
 :deep(.modal-table .arco-table-th-title) {

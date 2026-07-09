@@ -997,9 +997,22 @@ app.get('/api/admin/rooms', async (c) => {
     const page = parseInt(c.req.query('page') || '1');
     const pageSize = parseInt(c.req.query('pageSize') || '10');
     const roomCode = c.req.query('room_code') || '';
+    const sortField = c.req.query('sortField') || '';
+    const sortOrder = c.req.query('sortOrder') || '';
 
     const offset = (page - 1) * pageSize;
     const roomCodePattern = roomCode ? `%${roomCode}%` : '%';
+
+    // 默认按照房间 ID 倒序
+    let orderBySql = 'r.id DESC';
+    if (sortField && sortOrder) {
+      const order = sortOrder === 'ascend' ? 'ASC' : 'DESC';
+      if (sortField === 'max_winner_score') {
+        orderBySql = `max_winner_score ${order}`;
+      } else if (sortField === 'max_loser_score') {
+        orderBySql = `max_loser_score ${order}`;
+      }
+    }
 
     // 查询符合条件的房间总数
     const countRes = await c.env.DB
@@ -1008,17 +1021,21 @@ app.get('/api/admin/rooms', async (c) => {
       .first<any>();
     const total = countRes?.total || 0;
 
-    // 查询房间列表详情并关联创建者和人数
+    // 查询房间列表详情并关联创建者、人数、最大赢家和最大输家
     const listRes = await c.env.DB
       .prepare(
         `SELECT r.id, r.room_code, r.total_tea_money, r.tea_money_per_tx, r.tea_mode,
                 r.accumulated_tea_money, r.version, r.status, r.created_at,
                 u.nickname as owner_nickname,
-                (SELECT COUNT(*) FROM room_users ru WHERE ru.room_id = r.id) as player_count
+                (SELECT COUNT(*) FROM room_users ru WHERE ru.room_id = r.id) as player_count,
+                (SELECT u2.nickname FROM room_users ru2 JOIN users u2 ON ru2.user_id = u2.id WHERE ru2.room_id = r.id AND ru2.score > 0 ORDER BY ru2.score DESC LIMIT 1) as max_winner_name,
+                (SELECT ru2.score FROM room_users ru2 WHERE ru2.room_id = r.id AND ru2.score > 0 ORDER BY ru2.score DESC LIMIT 1) as max_winner_score,
+                (SELECT u3.nickname FROM room_users ru3 JOIN users u3 ON ru3.user_id = u3.id WHERE ru3.room_id = r.id AND ru3.score < 0 ORDER BY ru3.score ASC LIMIT 1) as max_loser_name,
+                (SELECT ru3.score FROM room_users ru3 WHERE ru3.room_id = r.id AND ru3.score < 0 ORDER BY ru3.score ASC LIMIT 1) as max_loser_score
          FROM rooms r
          LEFT JOIN users u ON r.owner_id = u.id
          WHERE r.room_code LIKE ?
-         ORDER BY r.id DESC
+         ORDER BY ${orderBySql}
          LIMIT ? OFFSET ?`
       )
       .bind(roomCodePattern, pageSize, offset)
@@ -1073,9 +1090,28 @@ app.get('/api/admin/users', async (c) => {
     const page = parseInt(c.req.query('page') || '1');
     const pageSize = parseInt(c.req.query('pageSize') || '10');
     const nickname = c.req.query('nickname') || '';
+    const sortField = c.req.query('sortField') || '';
+    const sortOrder = c.req.query('sortOrder') || '';
 
     const offset = (page - 1) * pageSize;
     const nicknamePattern = nickname ? `%${nickname}%` : '%';
+
+    // 默认按 ID 降序
+    let orderBySql = 'u.id DESC';
+    if (sortField && sortOrder) {
+      const order = sortOrder === 'ascend' ? 'ASC' : 'DESC';
+      if (sortField === 'total_games') {
+        orderBySql = `total_games ${order}`;
+      } else if (sortField === 'won_games') {
+        orderBySql = `won_games ${order}`;
+      } else if (sortField === 'lost_games') {
+        orderBySql = `lost_games ${order}`;
+      } else if (sortField === 'total_score') {
+        orderBySql = `total_score ${order}`;
+      } else if (sortField === 'win_rate') {
+        orderBySql = `(CAST(won_games AS FLOAT) / CASE WHEN total_games = 0 THEN 1 ELSE total_games END) ${order}`;
+      }
+    }
 
     // 查询用户总数
     const countRes = await c.env.DB
@@ -1094,7 +1130,7 @@ app.get('/api/admin/users', async (c) => {
                 (SELECT COALESCE(SUM(ru.score), 0) FROM room_users ru WHERE ru.user_id = u.id) as total_score
          FROM users u
          WHERE u.nickname LIKE ?
-         ORDER BY u.id DESC
+         ORDER BY ${orderBySql}
          LIMIT ? OFFSET ?`
       )
       .bind(nicknamePattern, pageSize, offset)

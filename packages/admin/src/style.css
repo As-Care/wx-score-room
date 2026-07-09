@@ -11,6 +11,10 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Custom variables for theme switcher */
+  --dark: #212121;
+  --offwhite: #fafafa;
 }
 
 body {
@@ -54,3 +58,40 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(11, 155, 119, 0.3);
 }
+
+/* Dark Mode overrides for layout components */
+body[arco-theme='dark'] {
+  background: #17171a !important;
+  color: #f5f5f5 !important;
+}
+
+body[arco-theme='dark'] .layout-container {
+  background: #17171a !important;
+}
+
+body[arco-theme='dark'] .glass-panel {
+  background: rgba(30, 30, 35, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2) !important;
+}
+
+body[arco-theme='dark'] .layout-header {
+  background: rgba(30, 30, 35, 0.7) !important;
+}
+
+body[arco-theme='dark'] .layout-sider {
+  background: rgba(30, 30, 35, 0.7) !important;
+}
+
+body[arco-theme='dark'] .main-card {
+  background: rgba(30, 30, 35, 0.8) !important;
+}
+
+body[arco-theme='dark'] .view-title {
+  color: #f5f5f5 !important;
+}
+
+body[arco-theme='dark'] .username {
+  color: #e2e8f0 !important;
+}
+
