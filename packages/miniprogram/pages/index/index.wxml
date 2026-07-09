@@ -7,6 +7,12 @@
   <!-- 页面主内容，防止被导航栏遮挡 -->
   <view class="content-wrapper" style="padding-top: {{statusBarHeight + navBarHeight + 10}}px;">
     
+    <!-- 平台公告 -->
+    <view class="announcement-banner flex-row align-center" wx:if="{{ announcement }}">
+      <van-icon name="volume-o" size="16px" color="#e29578" style="margin-right: 12rpx; flex-shrink: 0;" />
+      <text class="announcement-text">{{ announcement }}</text>
+    </view>
+    
     <!-- 个人信息卡片 (毛玻璃) -->
     <view class="glass-card profile-setup-card">
       <view class="card-header">

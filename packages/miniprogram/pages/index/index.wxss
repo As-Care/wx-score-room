@@ -10,6 +10,23 @@
   align-items: stretch;
 }
 
+/* 平台公告栏样式 */
+.announcement-banner {
+  background: rgba(226, 149, 120, 0.08);
+  border: 1px solid rgba(226, 149, 120, 0.15);
+  border-radius: 12rpx;
+  padding: 16rpx 24rpx;
+  margin-bottom: 24rpx;
+  box-sizing: border-box;
+}
+
+.announcement-text {
+  font-size: 26rpx;
+  color: #e29578;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 /* 个人信息设置卡片 */
 .profile-setup-card {
   margin-top: 20rpx;

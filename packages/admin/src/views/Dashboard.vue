@@ -42,6 +42,10 @@
             class="sidebar-menu"
             @menu-item-click="handleMenuClick"
           >
+            <a-menu-item key="Overview">
+              <template #icon><IconDashboard /></template>
+              大盘数据
+            </a-menu-item>
             <a-menu-item key="Rooms">
               <template #icon><IconHome /></template>
               房间管理
@@ -49,6 +53,10 @@
             <a-menu-item key="Users">
               <template #icon><IconUserGroup /></template>
               用户统计
+            </a-menu-item>
+            <a-menu-item key="Settings">
+              <template #icon><IconSettings /></template>
+              系统配置
             </a-menu-item>
           </a-menu>
         </a-layout-sider>

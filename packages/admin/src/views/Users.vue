@@ -73,6 +73,16 @@
               </span>
             </template>
           </a-table-column>
+          <a-table-column title="账号状态" :width="120">
+            <template #cell="{ record }">
+              <a-switch 
+                :model-value="record.status !== 0" 
+                type="round" 
+                size="small"
+                @change="(val) => handleStatusChange(record, val)"
+              />
+            </template>
+          </a-table-column>
           <a-table-column title="注册时间">
             <template #cell="{ record }">
               <span class="time-text">{{ formatTime(record.created_at) }}</span>
@@ -132,6 +142,34 @@ const handleReset = () => {
 const handlePageChange = (page) => {
   pagination.page = page;
   fetchUsers();
+};
+
+const handleStatusChange = async (record, val) => {
+  const token = localStorage.getItem('admin_token');
+  const targetStatus = val ? 1 : 0;
+  try {
+    const response = await fetch(`${API_BASE}/api/admin/user/status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        userId: record.id,
+        status: targetStatus
+      })
+    });
+    const result = await response.json();
+    if (result.code === 0) {
+      record.status = targetStatus;
+      Message.success(targetStatus === 0 ? `用户「${record.nickname}」已被成功封禁` : `用户「${record.nickname}」已解除封禁，恢复正常`);
+    } else {
+      Message.error(result.message || '操作失败');
+    }
+  } catch (err) {
+    console.error('Update status error', err);
+    Message.error('网络错误，修改失败');
+  }
 };
 
 const handleTableChange = (data, extra) => {

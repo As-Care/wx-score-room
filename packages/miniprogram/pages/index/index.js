@@ -13,7 +13,8 @@ Page({
     showExistingRoomModal: false,
     existingRoomCode: '',
     existingRoomId: '',
-    existingRoomExpireMinutes: 30
+    existingRoomExpireMinutes: 30,
+    announcement: ''
   },
 
   onLoad: function (options) {
@@ -27,6 +28,24 @@ Page({
     this.initUserSession().then(() => {
       // 3. 检查是否是通过“扫码/分享”携带参数进入的
       this.checkShareOptions(options);
+    });
+  },
+
+  onShow: function () {
+    this.fetchSystemConfig();
+  },
+
+  fetchSystemConfig: function () {
+    app.request({
+      url: '/api/config',
+      method: 'GET'
+    }).then(res => {
+      this.setData({
+        announcement: res.announcement || ''
+      });
+      app.globalData.maintenanceMode = res.maintenance_mode === 1;
+    }).catch(err => {
+      console.error('获取系统配置失败', err);
     });
   },
 
@@ -221,6 +240,14 @@ Page({
 
   // 创建房间并自动进入
   onCreateRoom: function (forceNew = false) {
+    if (app.globalData.maintenanceMode) {
+      wx.showModal({
+        title: '系统维护中',
+        content: '系统当前正在例行维护中，期间暂停创建房间。请稍后再试！',
+        showCancel: false
+      });
+      return;
+    }
     if (!this.checkSessionReady()) return;
     if (!this.data.nickname.trim()) {
       wx.showToast({ title: '请先设置您的昵称', icon: 'none' });
@@ -341,6 +368,14 @@ Page({
 
   // 统一执行加入房间的 HTTP 请求与跳转
   executeJoinRoom: function (roomCode) {
+    if (app.globalData.maintenanceMode) {
+      wx.showModal({
+        title: '系统维护中',
+        content: '系统当前正在例行维护中，期间暂停加入房间。请稍后再试！',
+        showCancel: false
+      });
+      return;
+    }
     app.request({
       url: '/api/room/join',
       method: 'POST',

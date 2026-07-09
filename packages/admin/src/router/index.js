@@ -3,6 +3,8 @@ import Login from '../views/Login.vue';
 import Dashboard from '../views/Dashboard.vue';
 import Rooms from '../views/Rooms.vue';
 import Users from '../views/Users.vue';
+import Overview from '../views/Overview.vue';
+import Settings from '../views/Settings.vue';
 
 const routes = [
   {
@@ -18,7 +20,12 @@ const routes = [
     children: [
       {
         path: '',
-        redirect: '/dashboard/rooms'
+        redirect: '/dashboard/overview'
+      },
+      {
+        path: 'overview',
+        name: 'Overview',
+        component: Overview
       },
       {
         path: 'rooms',
@@ -29,12 +36,17 @@ const routes = [
         path: 'users',
         name: 'Users',
         component: Users
+      },
+      {
+        path: 'settings',
+        name: 'Settings',
+        component: Settings
       }
     ]
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/dashboard/rooms'
+    redirect: '/dashboard/overview'
   }
 ];
 
@@ -54,7 +66,7 @@ router.beforeEach((to, from, next) => {
     }
   } else if (to.matched.some(record => record.meta.requiresGuest)) {
     if (token) {
-      next('/dashboard/rooms');
+      next('/dashboard/overview');
     } else {
       next();
     }

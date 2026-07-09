@@ -45,9 +45,13 @@ async function authenticate(request: Request, db: D1Database) {
 
   // 1. 查询用户
   let user = await db
-    .prepare('SELECT id, openid, nickname, avatar_url, created_at FROM users WHERE openid = ?')
+    .prepare('SELECT id, openid, nickname, avatar_url, created_at, status FROM users WHERE openid = ?')
     .bind(token)
     .first<any>();
+
+  if (user && user.status === 0) {
+    throw new Error('您的账号已被管理员封禁，无法使用系统服务');
+  }
 
   // 2. 如果不存在，自动进行静默降级注册
   if (!user) {
@@ -59,7 +63,7 @@ async function authenticate(request: Request, db: D1Database) {
       .run();
 
     user = await db
-      .prepare('SELECT id, openid, nickname, avatar_url, created_at FROM users WHERE openid = ?')
+      .prepare('SELECT id, openid, nickname, avatar_url, created_at, status FROM users WHERE openid = ?')
       .bind(token)
       .first<any>();
   }
@@ -296,6 +300,21 @@ app.post('/api/room/create', async (c) => {
     const user = await authenticate(c.req.raw, c.env.DB);
     const body = await c.req.json().catch(() => ({}));
 
+    // 检查系统维护状态
+    const maintenanceRes = await c.env.DB.prepare('SELECT value FROM system_configs WHERE key = "maintenance_mode"').first<any>();
+    if (maintenanceRes && maintenanceRes.value === '1') {
+      return jsonErr(403, '系统处于维护中，暂停创建房间！');
+    }
+
+    // 检查用户创建的活跃房间数上限
+    const maxActiveRoomsRes = await c.env.DB.prepare('SELECT value FROM system_configs WHERE key = "max_active_rooms"').first<any>();
+    const maxRooms = parseInt(maxActiveRoomsRes?.value || '5');
+    const activeRoomsCountRes = await c.env.DB.prepare('SELECT COUNT(*) as count FROM rooms WHERE owner_id = ? AND status = 0').bind(user.id).first<any>();
+    const activeRoomsCount = activeRoomsCountRes?.count || 0;
+    if (activeRoomsCount >= maxRooms) {
+      return jsonErr(400, `您当前已有 ${activeRoomsCount} 个进行中的房间，达到系统限制（最大 ${maxRooms} 个），请先结算历史房间！`);
+    }
+
     // 使用非阻塞的 waitUntil 执行后台清理与自动结算，极大缩短 API 响应延时
     if (c.executionCtx?.waitUntil) {
       c.executionCtx.waitUntil(cleanupExpiredRooms(c.env.DB));
@@ -434,6 +453,12 @@ app.post('/api/room/join', async (c) => {
     const user = await authenticate(c.req.raw, c.env.DB);
     const body = await c.req.json();
     const roomCode = body.room_code;
+
+    // 检查系统维护状态
+    const maintenanceRes = await c.env.DB.prepare('SELECT value FROM system_configs WHERE key = "maintenance_mode"').first<any>();
+    if (maintenanceRes && maintenanceRes.value === '1') {
+      return jsonErr(403, '系统处于维护中，暂停加入房间！');
+    }
 
     if (!roomCode) {
       return jsonErr(400, '房间号不能为空');
@@ -959,7 +984,34 @@ app.get('/api/user/history', async (c) => {
   } catch (err: any) {
     return jsonErr(401, err.message || '未授权操作');
   }
-});// ==================== 管理端 (Admin) 接口与鉴权中间件 ====================
+});
+
+// 12. 获取系统公开配置 (小程序端免登录)
+app.get('/api/config', async (c) => {
+  try {
+    await ensureSchema(c.env.DB);
+    const res = await c.env.DB.prepare('SELECT key, value FROM system_configs').all<any>();
+    const configs: any = {
+      announcement: '',
+      maintenance_mode: '0'
+    };
+
+    if (res.results) {
+      for (const row of res.results) {
+        configs[row.key] = row.value;
+      }
+    }
+
+    return jsonOk({
+      announcement: configs.announcement,
+      maintenance_mode: parseInt(configs.maintenance_mode || '0')
+    });
+  } catch (err: any) {
+    return jsonErr(500, err.message || '获取系统配置失败');
+  }
+});
+
+// ==================== 管理端 (Admin) 接口与鉴权中间件 ====================
 
 function authenticateAdmin(request: Request) {
   const authHeader = request.headers.get('Authorization');
@@ -986,6 +1038,106 @@ app.post('/api/admin/login', async (c) => {
     }
   } catch (err: any) {
     return jsonErr(500, err.message || '系统错误');
+  }
+});
+
+// 1.2 大盘数据总览 (管理端)
+app.get('/api/admin/dashboard', async (c) => {
+  try {
+    authenticateAdmin(c.req.raw);
+    await ensureSchema(c.env.DB);
+
+    const totalUsers = await c.env.DB.prepare('SELECT COUNT(*) as total FROM users').first<any>();
+    const activeRooms = await c.env.DB.prepare('SELECT COUNT(*) as total FROM rooms WHERE status = 0').first<any>();
+    const totalRooms = await c.env.DB.prepare('SELECT COUNT(*) as total FROM rooms').first<any>();
+    const totalTxs = await c.env.DB.prepare('SELECT COUNT(*) as total FROM transactions WHERE is_undone = 0').first<any>();
+
+    return jsonOk({
+      total_users: totalUsers?.total || 0,
+      active_rooms: activeRooms?.total || 0,
+      total_rooms: totalRooms?.total || 0,
+      total_transactions: totalTxs?.total || 0
+    });
+  } catch (err: any) {
+    return jsonErr(401, err.message || '未授权操作');
+  }
+});
+
+// 1.3 用户状态管理 (拉黑/解封)
+app.post('/api/admin/user/status', async (c) => {
+  try {
+    authenticateAdmin(c.req.raw);
+    await ensureSchema(c.env.DB);
+
+    const body = await c.req.json().catch(() => ({}));
+    const { userId, status } = body;
+
+    if (userId === undefined || status === undefined || (status !== 0 && status !== 1)) {
+      return jsonErr(400, '请求参数不完整或无效');
+    }
+
+    await c.env.DB.prepare('UPDATE users SET status = ? WHERE id = ?')
+      .bind(status, userId)
+      .run();
+
+    return jsonOk({ success: true });
+  } catch (err: any) {
+    return jsonErr(401, err.message || '未授权操作');
+  }
+});
+
+// 1.4 读取系统配置 (管理端)
+app.get('/api/admin/config', async (c) => {
+  try {
+    authenticateAdmin(c.req.raw);
+    await ensureSchema(c.env.DB);
+
+    const res = await c.env.DB.prepare('SELECT key, value FROM system_configs').all<any>();
+    const configs: any = {
+      announcement: '',
+      max_active_rooms: '5',
+      maintenance_mode: '0'
+    };
+
+    if (res.results) {
+      for (const row of res.results) {
+        configs[row.key] = row.value;
+      }
+    }
+
+    return jsonOk(configs);
+  } catch (err: any) {
+    return jsonErr(401, err.message || '未授权操作');
+  }
+});
+
+// 1.5 保存系统配置 (管理端)
+app.post('/api/admin/config', async (c) => {
+  try {
+    authenticateAdmin(c.req.raw);
+    await ensureSchema(c.env.DB);
+
+    const body = await c.req.json().catch(() => ({}));
+    const statements = [];
+
+    for (const key of ['announcement', 'max_active_rooms', 'maintenance_mode']) {
+      if (body[key] !== undefined) {
+        const valStr = String(body[key]);
+        statements.push(
+          c.env.DB.prepare(
+            'INSERT INTO system_configs (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?'
+          ).bind(key, valStr, valStr)
+        );
+      }
+    }
+
+    if (statements.length > 0) {
+      await c.env.DB.batch(statements);
+    }
+
+    return jsonOk({ success: true });
+  } catch (err: any) {
+    return jsonErr(401, err.message || '未授权操作');
   }
 });
 
@@ -1123,7 +1275,7 @@ app.get('/api/admin/users', async (c) => {
     // 查询用户明细及积分汇总统计
     const listRes = await c.env.DB
       .prepare(
-        `SELECT u.id, u.nickname, u.avatar_url, u.openid, u.created_at,
+        `SELECT u.id, u.nickname, u.avatar_url, u.openid, u.created_at, u.status,
                 (SELECT COUNT(*) FROM room_users ru WHERE ru.user_id = u.id) as total_games,
                 (SELECT COUNT(*) FROM room_users ru WHERE ru.user_id = u.id AND ru.score > 0) as won_games,
                 (SELECT COUNT(*) FROM room_users ru WHERE ru.user_id = u.id AND ru.score < 0) as lost_games,
@@ -1218,6 +1370,21 @@ async function ensureSchema(db: D1Database) {
   } catch (e) {}
   try {
     await db.prepare("CREATE INDEX IF NOT EXISTS idx_tx_room_undone ON transactions(room_id, is_undone)").run();
+  } catch (e) {}
+  
+  // 增加系统配置表
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS system_configs (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      )
+    `).run();
+  } catch (e) {}
+  
+  // 为用户增加 status 状态列 (0: 禁用, 1: 正常)
+  try {
+    await db.prepare("ALTER TABLE users ADD COLUMN status INTEGER DEFAULT 1").run();
   } catch (e) {}
 }
 
