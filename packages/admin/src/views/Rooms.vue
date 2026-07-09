@@ -91,7 +91,7 @@
     <a-modal
       v-model:visible="modalVisible"
       :title="`📜 房间 [${selectedRoomCode}] 记账流水明细`"
-      width="960px"
+      width="1060px"
       :footer="false"
       class="custom-modal"
     >
