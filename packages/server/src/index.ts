@@ -1274,7 +1274,6 @@ app.get('/api/admin/room/transactions', async (c) => {
 app.delete('/api/admin/room', async (c) => {
   try {
     authenticateAdmin(c.req.raw);
-    await ensureSchema(c.env.DB);
 
     const roomIdStr = c.req.query('room_id');
     if (!roomIdStr) {
@@ -1303,10 +1302,12 @@ app.delete('/api/admin/room', async (c) => {
       return jsonErr(400, '进行中且多于一人的房间不可删除');
     }
 
-    // 执行物理删除
-    await c.env.DB.prepare('DELETE FROM transactions WHERE room_id = ?').bind(roomId).run();
-    await c.env.DB.prepare('DELETE FROM room_users WHERE room_id = ?').bind(roomId).run();
-    await c.env.DB.prepare('DELETE FROM rooms WHERE id = ?').bind(roomId).run();
+    // 使用 D1 batch 进行批量原子操作，减少数据库往返延迟
+    await c.env.DB.batch([
+      c.env.DB.prepare('DELETE FROM transactions WHERE room_id = ?').bind(roomId),
+      c.env.DB.prepare('DELETE FROM room_users WHERE room_id = ?').bind(roomId),
+      c.env.DB.prepare('DELETE FROM rooms WHERE id = ?').bind(roomId)
+    ]);
 
     return jsonOk({ success: true });
   } catch (err: any) {

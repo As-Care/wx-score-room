@@ -90,7 +90,7 @@
                 </a-tooltip>
                 <a-tooltip :content="record.status !== 1 && record.player_count !== 1 ? '进行中且多于一人的房间不可删除' : '删除房间'" position="top">
                   <a-popconfirm content="确认删除该房间的所有数据（包含流水、玩家战绩和总积分）吗？此操作无法恢复。" position="br" type="warning" @ok="handleDeleteRoom(record)">
-                    <a-button type="outline" status="danger" shape="circle" size="small" class="delete-btn" :disabled="record.status !== 1 && record.player_count !== 1">
+                    <a-button type="outline" status="danger" shape="circle" size="small" class="delete-btn" :loading="record.deleteLoading" :disabled="record.status !== 1 && record.player_count !== 1">
                       <template #icon><icon-delete /></template>
                     </a-button>
                   </a-popconfirm>
@@ -242,7 +242,10 @@ const fetchRooms = async () => {
     });
     const result = await response.json();
     if (result.code === 0) {
-      list.value = result.data.list;
+      list.value = (result.data.list || []).map(r => ({
+        ...r,
+        deleteLoading: false
+      }));
       total.value = result.data.total;
     } else {
       Message.error(result.message || '获取房间列表失败');
@@ -290,6 +293,7 @@ const showTransactions = async (room) => {
 };
 
 const handleDeleteRoom = async (room) => {
+  room.deleteLoading = true;
   const token = localStorage.getItem('admin_token');
   try {
     const url = `${API_BASE}/api/admin/room?room_id=${room.id}`;
@@ -305,10 +309,12 @@ const handleDeleteRoom = async (room) => {
       fetchRooms(); // 重新加载表格数据
     } else {
       Message.error(result.message || '删除房间失败');
+      room.deleteLoading = false;
     }
   } catch (err) {
     console.error('Delete room error', err);
     Message.error('网络错误或无权限，删除房间失败');
+    room.deleteLoading = false;
   }
 };
 
