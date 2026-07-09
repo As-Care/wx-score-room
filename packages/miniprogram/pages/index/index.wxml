@@ -5,7 +5,7 @@
   </view>
 
   <!-- 页面主内容，防止被导航栏遮挡 -->
-  <view class="content-wrapper" style="padding-top: {{statusBarHeight + navBarHeight + 10}}px;">
+  <view class="content-wrapper" style="padding-top: {{statusBarHeight + navBarHeight}}px;">
     
     <!-- 平台公告 -->
     <view class="announcement-banner flex-row align-center" wx:if="{{ announcement }}">

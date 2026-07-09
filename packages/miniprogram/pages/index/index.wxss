@@ -14,9 +14,8 @@
 .announcement-banner {
   background: rgba(226, 149, 120, 0.08);
   border: 1px solid rgba(226, 149, 120, 0.15);
-  border-radius: 12rpx;
   padding: 16rpx 24rpx;
-  margin-bottom: 24rpx;
+  border-top: none;
   box-sizing: border-box;
 }
 
@@ -191,7 +190,7 @@
 
 /* 个人战绩大厅按钮 */
 .history-entry-btn {
-  margin: 40rpx auto 0;
+  margin: 10rpx auto 0;
   display: inline-flex;
   align-items: center;
   color: var(--theme-color-blue);
