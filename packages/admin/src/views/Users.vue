@@ -76,9 +76,17 @@
               />
             </template>
           </a-table-column>
-          <a-table-column title="注册时间">
+          <a-table-column title="注册时间" :width="180">
             <template #cell="{ record }">
               <span class="time-text">{{ formatTime(record.created_at) }}</span>
+            </template>
+          </a-table-column>
+          <a-table-column title="操作" :width="120">
+            <template #cell="{ record }">
+              <a-button type="text" size="small" @click="openHistory(record)">
+                <template #icon><IconHistory /></template>
+                对账明细
+              </a-button>
             </template>
           </a-table-column>
         </template>
@@ -96,6 +104,51 @@
         @change="handlePageChange"
       />
     </div>
+
+    <!-- 对账历史弹窗 -->
+    <a-modal
+      v-model:visible="showHistoryModal"
+      :title="`🔍 玩家「${selectedUser?.nickname || ''}」战绩对账单`"
+      width="800px"
+      :footer="false"
+      class="custom-modal"
+    >
+      <a-spin :loading="historyLoading" style="width: 100%">
+        <a-table :data="historyList" :pagination="{ pageSize: 8 }" size="medium">
+          <template #columns>
+            <a-table-column title="房间号" data-index="room_code">
+              <template #cell="{ record }">
+                <span class="room-code-tag">{{ record.room_code }}</span>
+              </template>
+            </a-table-column>
+            <a-table-column title="房主" data-index="owner_nickname">
+              <template #cell="{ record }">
+                <span>{{ record.owner_nickname || '已注销玩家' }}</span>
+              </template>
+            </a-table-column>
+            <a-table-column title="在此房得分">
+              <template #cell="{ record }">
+                <span :class="['total-score-badge', record.score > 0 ? 'score-win' : (record.score < 0 ? 'score-loss' : 'score-zero')]">
+                  {{ record.score > 0 ? '+' : '' }}{{ record.score }} 分
+                </span>
+              </template>
+            </a-table-column>
+            <a-table-column title="房间状态">
+              <template #cell="{ record }">
+                <a-tag :color="record.status === 1 ? 'gray' : 'green'" size="small">
+                  {{ record.status === 1 ? '已结束' : '进行中' }}
+                </a-tag>
+              </template>
+            </a-table-column>
+            <a-table-column title="加入时间">
+              <template #cell="{ record }">
+                <span class="time-text">{{ formatTime(record.joined_at) }}</span>
+              </template>
+            </a-table-column>
+          </template>
+        </a-table>
+      </a-spin>
+    </a-modal>
   </div>
 </template>
 
@@ -107,6 +160,38 @@ import { API_BASE } from '../config';
 const list = ref([]);
 const total = ref(0);
 const loading = ref(false);
+
+const showHistoryModal = ref(false);
+const historyLoading = ref(false);
+const historyList = ref([]);
+const selectedUser = ref(null);
+
+const openHistory = async (record) => {
+  selectedUser.value = record;
+  showHistoryModal.value = true;
+  historyLoading.value = true;
+  historyList.value = [];
+  
+  const token = localStorage.getItem('admin_token');
+  try {
+    const response = await fetch(`${API_BASE}/api/admin/user/rooms?userId=${record.id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    const result = await response.json();
+    if (result.code === 0) {
+      historyList.value = result.data || [];
+    } else {
+      Message.error(result.message || '获取战绩明细失败');
+    }
+  } catch (err) {
+    console.error('Fetch user history error', err);
+    Message.error('无法连接服务器获取数据');
+  } finally {
+    historyLoading.value = false;
+  }
+};
 
 const query = reactive({
   nickname: '',
@@ -339,5 +424,20 @@ body[arco-theme='dark'] .win-rate-text {
   display: flex;
   justify-content: flex-end;
   flex-shrink: 0;
+}
+
+.room-code-tag {
+  font-family: 'Outfit', monospace;
+  font-weight: 700;
+  color: #4a5568;
+  background: rgba(74, 85, 104, 0.08);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+body[arco-theme='dark'] .room-code-tag {
+  color: #cbd5e0;
+  background: rgba(203, 213, 224, 0.12);
 }
 </style>

@@ -1090,6 +1090,38 @@ app.post('/api/admin/user/status', async (c) => {
   }
 });
 
+// 1.3.5 获取指定用户的房间对账明细 (管理端)
+app.get('/api/admin/user/rooms', async (c) => {
+  try {
+    authenticateAdmin(c.req.raw);
+    await ensureSchema(c.env.DB);
+
+    const userIdStr = c.req.query('userId');
+    if (!userIdStr) {
+      return jsonErr(400, '请求参数 userId 缺失');
+    }
+    const userId = parseInt(userIdStr);
+
+    const roomsRes = await c.env.DB
+      .prepare(
+        `SELECT ru.room_id, ru.score, ru.joined_at,
+                r.room_code, r.status, r.created_at,
+                u_owner.nickname as owner_nickname
+         FROM room_users ru
+         JOIN rooms r ON ru.room_id = r.id
+         LEFT JOIN users u_owner ON r.owner_id = u_owner.id
+         WHERE ru.user_id = ?
+         ORDER BY ru.joined_at DESC`
+      )
+      .bind(userId)
+      .all<any>();
+
+    return jsonOk(roomsRes.results || []);
+  } catch (err: any) {
+    return jsonErr(401, err.message || '未授权操作');
+  }
+});
+
 // 1.4 读取系统配置 (管理端)
 app.get('/api/admin/config', async (c) => {
   try {
