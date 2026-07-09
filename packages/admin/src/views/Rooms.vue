@@ -88,9 +88,9 @@
                     <template #icon><icon-list /></template>
                   </a-button>
                 </a-tooltip>
-                <a-tooltip :content="record.status !== 1 ? '进行中的房间不可删除' : '删除房间'" position="top">
-                  <a-popconfirm content="确认删除该房间的所有数据（包含流水、玩家战绩和总积分）吗？此操作无法恢复。" position="tr" type="warning" @ok="handleDeleteRoom(record)">
-                    <a-button type="outline" status="danger" shape="circle" size="small" class="delete-btn" :disabled="record.status !== 1">
+                <a-tooltip :content="record.status !== 1 && record.player_count !== 1 ? '进行中且多于一人的房间不可删除' : '删除房间'" position="top">
+                  <a-popconfirm content="确认删除该房间的所有数据（包含流水、玩家战绩和总积分）吗？此操作无法恢复。" position="br" type="warning" @ok="handleDeleteRoom(record)">
+                    <a-button type="outline" status="danger" shape="circle" size="small" class="delete-btn" :disabled="record.status !== 1 && record.player_count !== 1">
                       <template #icon><icon-delete /></template>
                     </a-button>
                   </a-popconfirm>

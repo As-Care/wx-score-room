@@ -1270,6 +1270,50 @@ app.get('/api/admin/room/transactions', async (c) => {
   }
 });
 
+// 3.5 删除房间 (管理端)
+app.delete('/api/admin/room', async (c) => {
+  try {
+    authenticateAdmin(c.req.raw);
+    await ensureSchema(c.env.DB);
+
+    const roomIdStr = c.req.query('room_id');
+    if (!roomIdStr) {
+      return jsonErr(400, '缺失房间ID');
+    }
+    const roomId = parseInt(roomIdStr);
+
+    // 查询房间状态和人数
+    const room = await c.env.DB
+      .prepare(`
+        SELECT r.status, 
+               (SELECT COUNT(1) FROM room_users ru WHERE ru.room_id = r.id) as player_count
+        FROM rooms r
+        WHERE r.id = ?
+      `)
+      .bind(roomId)
+      .first<any>();
+
+    if (!room) {
+      return jsonErr(404, '房间不存在');
+    }
+
+    // 限制：只有已结算 (status === 1) 或 进行中且只有一人的房间 (status === 0 && player_count === 1) 允许删除
+    const canDelete = room.status === 1 || (room.status === 0 && room.player_count === 1);
+    if (!canDelete) {
+      return jsonErr(400, '进行中且多于一人的房间不可删除');
+    }
+
+    // 执行物理删除
+    await c.env.DB.prepare('DELETE FROM transactions WHERE room_id = ?').bind(roomId).run();
+    await c.env.DB.prepare('DELETE FROM room_users WHERE room_id = ?').bind(roomId).run();
+    await c.env.DB.prepare('DELETE FROM rooms WHERE id = ?').bind(roomId).run();
+
+    return jsonOk({ success: true });
+  } catch (err: any) {
+    return jsonErr(401, err.message || '未授权操作');
+  }
+});
+
 // 4. 用户列表 (管理端)
 app.get('/api/admin/users', async (c) => {
   try {
