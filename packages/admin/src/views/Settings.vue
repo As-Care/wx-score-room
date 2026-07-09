@@ -6,7 +6,7 @@
 
     <div class="settings-content">
       <a-spin :loading="loading" style="width: 100%">
-        <a-form :model="form" layout="vertical" class="settings-form" @submit.prevent="handleSave">
+        <a-form :model="form" layout="vertical" class="settings-form" @submit="handleSave">
           
           <!-- Section 1: 公告设置 -->
           <div class="settings-section glass-panel">
