@@ -1389,7 +1389,10 @@ async function autoSettleInactiveRooms(db: D1Database, roomDoNamespace?: Durable
   }
 }
 
+let schemaEnsured = false;
+
 async function ensureSchema(db: D1Database) {
+  if (schemaEnsured) return;
   try {
     await db.prepare("ALTER TABLE rooms ADD COLUMN tea_mode INTEGER DEFAULT 0").run();
   } catch (e) {
@@ -1433,6 +1436,7 @@ async function ensureSchema(db: D1Database) {
   try {
     await db.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_to ON transactions(to_user_id)").run();
   } catch (e) {}
+  schemaEnsured = true;
 }
 
 async function dbGetOrCreateUser(db: D1Database, openid: string) {

@@ -68,12 +68,20 @@
           </a-table-column>
           <a-table-column title="账号状态" :width="120">
             <template #cell="{ record }">
-              <a-switch 
-                :model-value="record.status !== 0" 
-                type="round" 
-                size="small"
-                @change="(val) => handleStatusChange(record, val)"
-              />
+              <a-popconfirm 
+                :content="`确定要${record.status === 0 ? '解封' : '封禁'}用户「${record.nickname}」吗？`" 
+                position="tr" 
+                type="warning"
+                @ok="handleStatusConfirm(record)"
+              >
+                <a-switch 
+                  :model-value="record.status !== 0" 
+                  type="round" 
+                  size="small"
+                  :loading="record.statusLoading"
+                  style="cursor: pointer"
+                />
+              </a-popconfirm>
             </template>
           </a-table-column>
           <a-table-column title="注册时间" :width="180">
@@ -222,9 +230,15 @@ const handlePageChange = (page) => {
   fetchUsers();
 };
 
-const handleStatusChange = async (record, val) => {
+const handleStatusConfirm = async (record) => {
+  const currentStatus = record.status;
+  const targetStatus = currentStatus === 0 ? 1 : 0;
+  
+  // 乐观更新：立刻在界面上改变状态并进入 Loading
+  record.status = targetStatus;
+  record.statusLoading = true;
+  
   const token = localStorage.getItem('admin_token');
-  const targetStatus = val ? 1 : 0;
   try {
     const response = await fetch(`${API_BASE}/api/admin/user/status`, {
       method: 'POST',
@@ -239,14 +253,20 @@ const handleStatusChange = async (record, val) => {
     });
     const result = await response.json();
     if (result.code === 0) {
-      record.status = targetStatus;
+      // 成功：无需额外操作，更不需要刷新列表
       Message.success(targetStatus === 0 ? `用户「${record.nickname}」已被成功封禁` : `用户「${record.nickname}」已解除封禁，恢复正常`);
     } else {
+      // 失败：回滚状态
+      record.status = currentStatus;
       Message.error(result.message || '操作失败');
     }
   } catch (err) {
     console.error('Update status error', err);
+    // 异常：回滚状态
+    record.status = currentStatus;
     Message.error('网络错误，修改失败');
+  } finally {
+    record.statusLoading = false;
   }
 };
 
@@ -276,6 +296,7 @@ const fetchUsers = async () => {
     if (result.code === 0) {
       list.value = (result.data.list || []).map(u => ({
         ...u,
+        statusLoading: false,
         win_rate: u.total_games > 0 ? parseFloat(((u.won_games / u.total_games) * 100).toFixed(1)) : 0
       }));
       total.value = result.data.total;
