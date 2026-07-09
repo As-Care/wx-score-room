@@ -81,6 +81,28 @@ App({
             return;
           }
 
+          if (res.statusCode === 403) {
+            // 清除本地缓存
+            wx.removeStorageSync('token');
+            wx.removeStorageSync('userInfo');
+            that.globalData.token = '';
+            that.globalData.userInfo = null;
+
+            wx.showModal({
+              title: '账号已停用',
+              content: res.data?.message || '您的账号已被管理员封禁，无法使用系统服务',
+              showCancel: false,
+              confirmText: '我知道了',
+              success: () => {
+                wx.reLaunch({
+                  url: '/pages/index/index'
+                });
+              }
+            });
+            reject(new Error(res.data?.message || 'Forbidden'));
+            return;
+          }
+
           if (res.statusCode >= 400) {
             wx.showToast({
               title: res.data?.message || `服务器错误(${res.statusCode})`,

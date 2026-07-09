@@ -24,9 +24,13 @@ const jsonOk = (data: any) => {
 };
 
 const jsonErr = (code: number, message: string) => {
+  const httpStatus = message && message.includes('封禁') ? 403 : 200;
   return new Response(
-    JSON.stringify({ code, message, data: null }),
-    { headers: { 'Content-Type': 'application/json' } }
+    JSON.stringify({ code: httpStatus === 403 ? 403 : code, message, data: null }),
+    { 
+      status: httpStatus,
+      headers: { 'Content-Type': 'application/json' } 
+    }
   );
 };
 
@@ -1385,6 +1389,17 @@ async function ensureSchema(db: D1Database) {
   // 为用户增加 status 状态列 (0: 禁用, 1: 正常)
   try {
     await db.prepare("ALTER TABLE users ADD COLUMN status INTEGER DEFAULT 1").run();
+  } catch (e) {}
+
+  // 优化用户统计和战绩查询关联表索引
+  try {
+    await db.prepare("CREATE INDEX IF NOT EXISTS idx_room_users_user_score ON room_users(user_id, score)").run();
+  } catch (e) {}
+  try {
+    await db.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_from ON transactions(from_user_id)").run();
+  } catch (e) {}
+  try {
+    await db.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_to ON transactions(to_user_id)").run();
   } catch (e) {}
 }
 
