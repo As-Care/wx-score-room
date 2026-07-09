@@ -91,7 +91,7 @@
     <a-modal
       v-model:visible="modalVisible"
       :title="`📜 房间 [${selectedRoomCode}] 记账流水明细`"
-      width="820px"
+      width="960px"
       :footer="false"
       class="custom-modal"
     >
@@ -101,32 +101,32 @@
       <div v-else>
         <a-table :data="transactions" :pagination="false" :bordered="false" class="modal-table">
           <template #columns>
-            <a-table-column title="序号" data-index="id" :width="80">
+            <a-table-column title="序号" data-index="id" :width="90">
               <template #cell="{ record, rowIndex }">
                 <span class="round-badge">R{{ transactions.length - rowIndex }}</span>
               </template>
             </a-table-column>
-            <a-table-column title="出分人 (扣分)">
+            <a-table-column title="出分人 (扣分)" :width="140">
               <template #cell="{ record }">
                 <span :class="{ 'undone-text': record.is_undone === 1 }">{{ record.from_nickname }}</span>
               </template>
             </a-table-column>
-            <a-table-column title="方向" :width="60">
+            <a-table-column title="方向" :width="70">
               <template #cell>
                 <span class="tx-arrow">➔</span>
               </template>
             </a-table-column>
-            <a-table-column title="得分人 (加分)">
+            <a-table-column title="得分人 (加分)" :width="140">
               <template #cell="{ record }">
                 <span :class="{ 'undone-text': record.is_undone === 1 }">{{ record.to_nickname }}</span>
               </template>
             </a-table-column>
-            <a-table-column title="分值">
+            <a-table-column title="分值" :width="110">
               <template #cell="{ record }">
                 <span :class="['score-val', record.is_undone === 1 ? 'undone-text' : 'score-active']">{{ record.amount }} 分</span>
               </template>
             </a-table-column>
-            <a-table-column title="已扣茶水">
+            <a-table-column title="已扣茶水" :width="120">
               <template #cell="{ record }">
                 <span :class="{ 'undone-text': record.is_undone === 1 }">{{ record.tea_deducted > 0 ? record.tea_deducted + ' 分' : '—' }}</span>
               </template>
@@ -138,7 +138,7 @@
                 </a-tag>
               </template>
             </a-table-column>
-            <a-table-column title="记账时间">
+            <a-table-column title="记账时间" :width="170">
               <template #cell="{ record }">
                 <span class="time-text">{{ formatTime(record.created_at) }}</span>
               </template>
@@ -383,5 +383,13 @@ onMounted(() => {
 
 .empty-tx {
   padding: 40px 0;
+}
+
+:deep(.modal-table .arco-table-th-title) {
+  white-space: nowrap !important;
+}
+
+:deep(.modal-table .arco-table-cell) {
+  white-space: nowrap !important;
 }
 </style>
