@@ -56,13 +56,6 @@
           </a-table-column>
           <a-table-column title="胜率" data-index="win_rate" :sortable="{ sortDirections: ['ascend', 'descend'], sorter: true }">
             <template #cell="{ record }">
-              <a-progress
-                type="circle"
-                :percent="getWinRateNum(record)"
-                size="mini"
-                :status="getWinRateStatus(record)"
-                style="margin-right: 8px"
-              />
               <span class="win-rate-text">{{ getWinRate(record) }}</span>
             </template>
           </a-table-column>
@@ -218,18 +211,7 @@ const getWinRate = (record) => {
   return `${((record.won_games / record.total_games) * 100).toFixed(1)}%`;
 };
 
-// Calculate win rate float
-const getWinRateNum = (record) => {
-  if (record.total_games === 0) return 0;
-  return parseFloat(((record.won_games / record.total_games)).toFixed(3));
-};
 
-const getWinRateStatus = (record) => {
-  const rate = getWinRateNum(record);
-  if (rate >= 0.6) return 'success';
-  if (rate >= 0.4) return 'normal';
-  return 'warning';
-};
 
 // Format UTC database time
 const formatTime = (timeStr) => {
